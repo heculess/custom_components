@@ -1,0 +1,4 @@
+turn_all_on:
+  description: restart the device.
+  fields:
+    id_list: {description: a list to turn on ., example: "switch.a, switch.b"}

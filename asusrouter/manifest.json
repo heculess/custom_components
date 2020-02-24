@@ -1,0 +1,14 @@
+{
+  "domain": "asusrouter",
+  "name": "asusrouter",
+  "documentation": "https://www.home-assistant.io/integrations/asuswrt",
+  "requirements": [
+    "aioasuswrt==1.1.22"
+  ],
+  "dependencies": [
+    "mqtt"
+  ],
+  "codeowners": [
+    "@heculess"
+  ]
+}
