@@ -26,6 +26,8 @@ _RET_IS_INITED = '/etc/inited'
 _ROUTER_RX_COMMAND = 'cat /sys/class/net/ppp0/statistics/rx_bytes'
 _ROUTER_TX_COMMAND = 'cat /sys/class/net/ppp0/statistics/tx_bytes'
 
+_DHCP_CLIENTS_COMMAND = 'cat /var/lib/misc/dnsmasq.leases'
+
 _CONF_VPN_PROTO_DEFAULE = 'disable'
 
 CHANGE_TIME_CACHE_DEFAULT = 5  # Default 60s
@@ -77,6 +79,7 @@ class AsuswrtSensor(Entity):
         self._mqtt = mqtt
         self._5g_wifi = 0
         self._2g_wifi = 0
+        self._client_number = 0
 
     @property
     def state(self):
@@ -261,6 +264,25 @@ class AsuswrtSensor(Entity):
         except  Exception as e:
             _LOGGER.error(e)
 
+    async def get_dhcp_clients(self):
+        """Get trace router attribute to mqtt."""
+        try:
+            connected_devices = await self._asusrouter.connection.async_run_command(
+                _DHCP_CLIENTS_COMMAND)
+            if  not connected_devices:
+                self._client_number = 0
+                return
+
+            client_count  = 0
+            for device in connected_devices:
+                dhcp_data = device.split(' ')
+                if len(dhcp_data) > 3:
+                    client_count  += 1
+
+            self._client_number = client_count
+        except  Exception as e:
+            _LOGGER.error(e)
+
     async def async_update(self):
         """Fetch status from router."""
         if self._asusrouter.connect_failed:
@@ -311,6 +333,8 @@ class AsuswrtSensor(Entity):
                 _STATES_WIFI_2G_CMD)
             if wifi_states_2g:
                 self._2g_wifi = int(wifi_states_2g[0])
+
+            await self.get_dhcp_clients()
 
             self._connected = True
             await self.async_get_public_ip()
@@ -380,6 +404,7 @@ class AsuswrtRouterSensor(AsuswrtSensor):
             'connect_state': self._connected,
             'ssid': self._asusrouter.ssid,
             'host': self._asusrouter.host,
+            'client_number': self._client_number,
             '2.4G_wifi': self._2g_wifi,
             '5G_wifi': self._5g_wifi,
             'vpn_username': self._ppoe_username,
