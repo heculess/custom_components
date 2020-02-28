@@ -27,10 +27,13 @@ _ROUTER_RX_COMMAND = 'cat /sys/class/net/ppp0/statistics/rx_bytes'
 _ROUTER_TX_COMMAND = 'cat /sys/class/net/ppp0/statistics/tx_bytes'
 
 _DHCP_CLIENTS_COMMAND = 'cat /var/lib/misc/dnsmasq.leases'
+_ARP_LIST_COMMAND = 'arp -n'
 
 _CONF_VPN_PROTO_DEFAULE = 'disable'
 
 CHANGE_TIME_CACHE_DEFAULT = 5  # Default 60s
+
+_IP_REGEX = compile(r'((?<![\.\d])(?:\d{1,3}\.){3}\d{1,3}(?![\.\d]))')
 
 async def async_setup_platform(hass, config, add_entities, discovery_info=None):
     """Set up the asusrouter."""
@@ -229,8 +232,7 @@ class AsuswrtSensor(Entity):
             if not public_ip:
                 ip_content = await self._asusrouter.connection.async_run_command('cat getip2')
                 if ip_content:
-                    pattern = compile(r'((?<![\.\d])(?:\d{1,3}\.){3}\d{1,3}(?![\.\d]))')
-                    ip_regx = pattern.findall(ip_content[0])
+                    ip_regx = _IP_REGEX.findall(ip_content[0])
                     if ip_regx:
                         public_ip = ip_regx[0]
             await self._asusrouter.connection.async_run_command('rm getip2')
@@ -273,10 +275,23 @@ class AsuswrtSensor(Entity):
                 self._client_number = 0
                 return
 
+            dict_arp = dict()
+            arp_list = await self._asusrouter.connection.async_run_command(
+                _ARP_LIST_COMMAND)
+            for arp in arp_list:
+                arp_info = arp.split(' ')
+                if len(arp_info) < 5:
+                    continue
+                dict_arp[arp_info[1].strip("()")] = arp_info[3]
+
             client_count  = 0
             for device in connected_devices:
-                dhcp_data = device.split(' ')
-                if len(dhcp_data) > 3:
+                dhcp_data = device.split(' ')     
+                ip_regx = _IP_REGEX.findall(device)
+                if not ip_regx:
+                    continue
+
+                if ip_regx[0] in dict_arp:
                     client_count  += 1
 
             self._client_number = client_count
