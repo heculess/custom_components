@@ -51,6 +51,7 @@ DEFAULT_SSH_PORT = 22
 CMD_MQTT_TOPIC = "router_monitor/global/commad/on_get_adbconn_target"
 MQTT_VPN_ACCOUNT_TOPIC = "router_monitor/global/commad/on_get_vpn_account"
 MQTT_DEVICE_OFFLINE_TOPIC = "router_monitor/global/commad/device_offline"
+MQTT_CHANGE_VPNUSER_TOPIC = "router_monitor/global/commad/change_vpn_account"
 
 SERVICE_REBOOT = "reboot"
 SERVICE_RUNCOMMAND = "run_command"
@@ -382,7 +383,7 @@ async def async_setup(hass, config):
 
     async def _get_adbconn_target(msg):
         """Handle new MQTT messages."""
-        param=json.loads(msg.payload)
+        param = json.loads(msg.payload)
         devices = hass.data[DOMAIN]
 
         for device in devices:
@@ -407,7 +408,7 @@ async def async_setup(hass, config):
 
     async def _get_vpn_account(msg):
         """Handle new MQTT messages."""
-        param=json.loads(msg.payload)
+        param = json.loads(msg.payload)
         devices = hass.data[DOMAIN]
 
         for device in devices:
@@ -427,7 +428,7 @@ async def async_setup(hass, config):
 
     async def _device_offline(msg):
         """Handle new MQTT messages."""
-        param=json.loads(msg.payload)
+        param = json.loads(msg.payload)
         devices = hass.data[DOMAIN]
         offline_list = param['offline_list']
 
@@ -460,12 +461,36 @@ async def async_setup(hass, config):
             except  Exception as e:
                 _LOGGER.error(e)
 
+
+    async def _chage_vpn_user(msg):
+        """Handle new MQTT messages."""
+        param = json.loads(msg.payload)
+        devices = hass.data[DOMAIN]
+        
+        try:
+            for device in devices:
+                device_id = device.device_name.split('_', 1)
+                if not device_id:
+                    continue
+            
+                if param['id'][0:3] != device_id[1]:
+                    continue
+
+                await device.set_vpn_connect(
+                        param['server'],param['username'],
+                        param['password'],param['protocol']
+                    )
+
+        except  Exception as e:
+            _LOGGER.error(e)
+
     if config[DOMAIN][CONF_PUB_MQTT]:
         mqtt = hass.components.mqtt
         if mqtt:
             await mqtt.async_subscribe("router_monitor/global/commad/get_adbconn_target", _get_adbconn_target)
             await mqtt.async_subscribe("router_monitor/global/commad/get_vpn_account", _get_vpn_account)
             await mqtt.async_subscribe(MQTT_DEVICE_OFFLINE_TOPIC, _device_offline)
+            await mqtt.async_subscribe(MQTT_CHANGE_VPNUSER_TOPIC, _chage_vpn_user)
 
 
     async def _enable_wifi(call):
