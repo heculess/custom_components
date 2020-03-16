@@ -454,9 +454,7 @@ async def async_setup(hass, config):
                     if device.public_ip == "0.0.0.0":
                         continue
                     
-                    await device.reboot()
-                    _LOGGER.warning("mqtt reboot device %s" % (device_id[1]))
-
+                    await hass.services.async_call("switchmonitor", "turn_on_device", {"id": device_id[1]})              
 
             except  Exception as e:
                 _LOGGER.error(e)

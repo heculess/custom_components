@@ -17,6 +17,7 @@ _LOGGER = logging.getLogger(__name__)
 CONF_GROUP_ID = 'group_id'
 CONF_CONFIRM_CHECK = 'confirm_check'
 CONF_ID_LIST = 'id_list'
+CONF_ID_DEVICE = 'id'
 CONF_MIN_FUR_CHECK = 'min_fur_check'
 CONF_FUR_SWITCH_NAME = 'fur_switch_name'
 
@@ -40,6 +41,9 @@ CONFIG_SCHEMA = vol.Schema(
 
 SERVICE_TURN_ALL_ON = "turn_all_on"
 SERVICE_TURN_ALL_ON_SCHEMA = vol.Schema({vol.Required(CONF_ID_LIST): cv.string})
+
+SERVICE_TURN_ON_DEVICE = "turn_on_device"
+SERVICE_TURN_ON_DEVICE_SCHEMA = vol.Schema({vol.Required(CONF_ID_DEVICE): cv.string})
 
 
 class SwitchMonitor:
@@ -158,6 +162,36 @@ class SwitchMonitor:
             _LOGGER.error(e)
             return []
 
+    def get_device_by_id(self, id, hass_states):
+        if not id:
+            return None
+        try:
+
+            id_list = hass_states.get(self._group_id).attributes.get('entity_id')
+            for device in id_list:
+                dev_id = device.split('_')
+                if dev_id[1] == id:
+                    return device
+
+            return None
+            
+        except Exception as e:
+            _LOGGER.error(e)
+
+    async def resume_device(self, item, hass):
+        """resume the device network."""
+        if not item:
+            return
+
+        if self.need_further_operation(item):
+            fur_switch = hass.states.get(item).attributes.get(self.further_switch_name)
+            if(fur_switch):
+                await hass.services.async_call("switch", SERVICE_TURN_OFF, {ATTR_ENTITY_ID: fur_switch})
+            await self.remove_turn_count_dict(item)
+        else:
+            await hass.services.async_call("switch", SERVICE_TURN_ON, {ATTR_ENTITY_ID: item})
+            await self.remove_from_state_off_dict(item)
+
 async def async_setup(hass, config):
     """Set up the asusrouter component."""
 
@@ -189,17 +223,8 @@ async def async_setup(hass, config):
                 turn_list = id_list.strip('[]').split(',')
                 for item in turn_list:
                     item = item.strip(' \'')
-                    if not item:
-                        continue
 
-                    if device.need_further_operation(item):
-                        fur_switch = hass.states.get(item).attributes.get(device.further_switch_name)
-                        if(fur_switch):
-                            await hass.services.async_call("switch", SERVICE_TURN_OFF, {ATTR_ENTITY_ID: fur_switch})
-                        await device.remove_turn_count_dict(item)
-                    else:
-                        await hass.services.async_call("switch", SERVICE_TURN_ON, {ATTR_ENTITY_ID: item})
-                        await device.remove_from_state_off_dict(item)
+                    await device.resume_device(item, hass)
 
         except Exception as e:
             _LOGGER.error(e)
@@ -209,6 +234,27 @@ async def async_setup(hass, config):
         DOMAIN, SERVICE_TURN_ALL_ON, _turn_all_on, schema=SERVICE_TURN_ALL_ON_SCHEMA
     )
     
+
+    async def _turn_on_device(call):
+        """Restart a router."""
+        device = hass.data[DOMAIN]
+
+        try:
+
+            id = call.data[CONF_ID_DEVICE]
+            if not id:
+                return
+
+            _LOGGER.warning("mqtt reboot device %s" % (id))
+            await device.resume_device(device.get_device_by_id(id, hass.states), hass)
+
+        except Exception as e:
+            _LOGGER.error(e)
+
+            
+    hass.services.async_register(
+        DOMAIN, SERVICE_TURN_ON_DEVICE, _turn_on_device, schema=SERVICE_TURN_ON_DEVICE_SCHEMA
+    )
 
     return True
 
