@@ -13,6 +13,7 @@ from homeassistant.const import (
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.discovery import async_load_platform
 from aioasuswrt.asuswrt import AsusWrt
+from datetime import datetime
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -151,6 +152,7 @@ class AsusRouter(AsusWrt):
         self._vpn_server = False
         self._public_ip = "0.0.0.0"
         self._ssid = ""
+        self._last_vpn_restart_time = None
 
     @property
     def device_name(self):
@@ -239,11 +241,31 @@ class AsusRouter(AsusWrt):
             self._connect_failed = True
             _LOGGER.error(e)
 
-    async def reboot(self):
+    def only_reboot_vpn(self):
+        """Return if only reboot vpn service."""
         if self._vpn_enabled:
+
+            now = datetime.utcnow()
+            if not self._last_vpn_restart_time:
+                self._last_vpn_restart_time = now
+                return True
+            
+            interval = (now - self._last_vpn_restart_time).total_seconds()
+            if interval < 300:
+                return True
+            if interval > 600:     
+                self._last_vpn_restart_time = now
+                return True         
+
+        self._last_vpn_restart_time = None
+        return False
+
+    async def reboot(self):
+        if self.only_reboot_vpn():
             await self.run_cmdline("service restart_vpncall")
         else:
             await self.run_cmdline("reboot")
+            
 
     async def run_command(self, command_line):
         await self.run_cmdline(command_line)
