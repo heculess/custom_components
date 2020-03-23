@@ -186,9 +186,13 @@ class SwitchMonitor:
         if self.need_further_operation(item):
             fur_switch = hass.states.get(item).attributes.get(self.further_switch_name)
             if(fur_switch):
+                _LOGGER.warning("mqtt turn off device %s" % (fur_switch))
                 await hass.services.async_call("switch", SERVICE_TURN_OFF, {ATTR_ENTITY_ID: fur_switch})
+            else:
+                _LOGGER.warning("miss device further infomation %s" % (fur_switch))
             await self.remove_turn_count_dict(item)
         else:
+            _LOGGER.warning("mqtt turn on device %s" % (item))
             await hass.services.async_call("switch", SERVICE_TURN_ON, {ATTR_ENTITY_ID: item})
             await self.remove_from_state_off_dict(item)
 
@@ -245,7 +249,6 @@ async def async_setup(hass, config):
             if not id:
                 return
 
-            _LOGGER.warning("mqtt reboot device %s" % (id))
             await device.resume_device(device.get_device_by_id(id, hass.states), hass)
 
         except Exception as e:
