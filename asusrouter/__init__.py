@@ -23,6 +23,7 @@ CONF_SSH_KEY = "ssh_key"
 CONF_ADD_ATTR = "add_attribute"
 CONF_PUB_MQTT = "pub_mqtt"
 CONF_SR_HOST_ID = "sr_host_id"
+CONF_MAX_OFFINE_SETTING = "max_offline_setting"
 CONF_SSID = "ssid"
 CONF_TARGETHOST = "target_host"
 CONF_PORT_EXTER = "external_port"
@@ -48,6 +49,7 @@ DOMAIN = "asusrouter"
 CONF_ROUTERS = "routers"
 DATA_ASUSWRT = DOMAIN
 DEFAULT_SSH_PORT = 22
+DEFAULT_MAX_OFFINLE = 5
 
 CMD_MQTT_TOPIC = "router_monitor/global/commad/on_get_adbconn_target"
 MQTT_VPN_ACCOUNT_TOPIC = "router_monitor/global/commad/on_get_vpn_account"
@@ -87,6 +89,7 @@ CONFIG_SCHEMA = vol.Schema(
                 vol.Optional(CONF_ADD_ATTR, default=False): cv.boolean,
                 vol.Optional(CONF_PUB_MQTT, default=False): cv.boolean,
                 vol.Optional(CONF_SR_HOST_ID, default=""): cv.string,
+                vol.Optional(CONF_MAX_OFFINE_SETTING, default=""): cv.string,
             }
         )
     },
@@ -153,6 +156,7 @@ class AsusRouter(AsusWrt):
         self._public_ip = "0.0.0.0"
         self._ssid = ""
         self._last_vpn_restart_time = None
+        self._max_offline_setting = None
 
     @property
     def device_name(self):
@@ -166,47 +170,47 @@ class AsusRouter(AsusWrt):
 
     @property
     def connect_failed(self):
-        """Return the host ip of the router."""
+        """Return if the router is connected failed."""
         return self._connect_failed
 
     @property
     def pub_mqtt(self):
-        """Return the host ip of the router."""
+        """Return if the mqtt is enabled"""
         return  self._pub_mqtt
 
     @property
     def public_ip(self):
-        """Return the host ip of the router."""
+        """Return the public ip of the router."""
         return  self._public_ip
 
     @property
     def add_attribute(self):
-        """Return the host ip of the router."""
+        """Return if auto add the attribute of the router."""
         return self._add_attribute
 
     @property
     def sr_host_id(self):
-        """Return the host ip of the router."""
+        """Return the server room ip device id."""
         return  self._sr_host_id
 
     @property
     def vpn_enabled(self):
-        """Return the host ip of the router."""
+        """Return if the router vpn is enabled."""
         return self._vpn_enabled
 
     @property
     def vpn_user(self):
-        """Return the host ip of the router."""
+        """Return the vpn user of the router."""
         return self._vpn_user
 
     @property
     def vpn_server(self):
-        """Return the host ip of the router."""
+        """Return the vpn server of the router."""
         return self._vpn_server
 
     @property
     def ssid(self):
-        """Return the host ip of the router."""
+        """Return the ssid of the router."""
         return self._ssid
 
     async def set_ssid(self, ssid):
@@ -232,6 +236,22 @@ class AsusRouter(AsusWrt):
 
     async def set_vpn_server(self, vpn_server):
         self._vpn_server = vpn_server
+
+    async def set_max_offline_setting(self, max_offline_setting):
+        self._max_offline_setting = max_offline_setting
+
+    def get_max_offine(self, hass):
+        """get max offine."""
+        if not self._max_offline_setting:
+          return DEFAULT_MAX_OFFINLE
+
+        if self._max_offline_setting == "":
+          return DEFAULT_MAX_OFFINLE
+
+        item = hass.states.get(self._max_offline_setting)
+        if not item:
+          return DEFAULT_MAX_OFFINLE
+        return int(float(item.state))
 
     async def run_cmdline(self, command_line):
         self._connect_failed = False
@@ -324,6 +344,7 @@ async def async_setup(hass, config):
         await router.set_add_attribute(config[DOMAIN][CONF_ADD_ATTR])
         await router.set_pub_mqtt(config[DOMAIN][CONF_PUB_MQTT])
         await router.set_sr_host_id(config[DOMAIN][CONF_SR_HOST_ID])
+        await router.set_max_offline_setting(config[DOMAIN][CONF_MAX_OFFINE_SETTING])
 
         routers.append(router)
 
@@ -460,11 +481,12 @@ async def async_setup(hass, config):
         for offline_item in offline_list:
             try:
 
-                if offline_item['online'] > 5:
-                    continue
-
                 for device in devices:
                     device_id = device.device_name.split('_', 1)
+
+                    if offline_item['online'] > device.get_max_offine(hass):
+                        continue
+
                     if not device_id:
                         continue
                 
