@@ -361,6 +361,8 @@ class AsuswrtSensor(Entity):
 
         except  Exception as e:
             self._connected = False
+            if self._asusrouter.connect_failed:
+                self._connect_state = '0'
             _LOGGER.error(e)
 
 

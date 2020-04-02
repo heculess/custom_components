@@ -115,29 +115,37 @@ class AliddnsSensor(Entity):
         Aliyun_API_Post = urlencode(Aliyun_API_Post)
         Aliyun_API_Request = get(self.Aliyun_API_URL + Aliyun_API_Post)
 
-        domainRecords = '';
+        domainRecords = ''
         try:
             domainRecords = Aliyun_API_Request.text
         except HTTPError as e:
             _LOGGER.error(e.code)
-        result = JSONDecoder().decode(domainRecords)
-        result = result['DomainRecords']['Record']
-        times = 0
-        check = 0
-        for record_info in result:
-            if record_info['RR'] == sub_domain:
-                check = 1; break;
+
+        try:
+            result = JSONDecoder().decode(domainRecords)
+            if not result:
+                return -1
+            result = result['DomainRecords']['Record']
+            times = 0
+            check = 0
+            for record_info in result:
+                if record_info['RR'] == sub_domain:
+                    check = 1
+                    break
+                else:
+                    times += 1
+            if check:
+                result = int(result[times]['RecordId'])
             else:
-                times += 1
-        if check:
-            result = int(result[times]['RecordId'])
-        else:
-            result = -1
-        return result
+                result = -1
+            return result
+        except  Exception as e:
+            _LOGGER.error(e)
+            return -1
 
     def ip_from3322(self):
         try:
-            ret = requests.get("http://members.3322.org/dyndns/getip")
+            ret = requests.get("https://members.3322.org/dyndns/getip", verify=False)
         except requests.RequestException as ex:
             return None
         if ret.status_code != requests.codes.ok:
@@ -145,14 +153,22 @@ class AliddnsSensor(Entity):
         return ret.content.decode('utf-8').rstrip("\n")
 
     def ip_from_sohu(self):
-        get_ip_method = popen('curl -s pv.sohu.com/cityjson?ie=utf-8')
+        get_ip_method = popen('curl -s https://pv.sohu.com/cityjson?ie=utf-8')
+        if not get_ip_method:
+            return None
         get_ip_responses = get_ip_method.readlines()[0]	
+        if not get_ip_responses:
+            return None
         get_ip_pattern = compile(r'(?<![\.\d])(?:\d{1,3}\.){3}\d{1,3}(?![\.\d])')	
-        get_ip_value = get_ip_pattern.findall(get_ip_responses)[0]
-        return get_ip_value
+        get_ip_value = get_ip_pattern.findall(get_ip_responses)
+        if not get_ip_value:
+            return None
+        return get_ip_value[0]
 
     def ip_from_netcn(self):
         opener = urlopen('http://www.net.cn/static/customercare/yourip.asp')
+        if not opener:
+            return None
         strg = opener.read().decode('gbk')
         ipaddr = search('\d+\.\d+\.\d+\.\d+',strg).group(0)
         return ipaddr
@@ -214,7 +230,10 @@ class AliddnsSensor(Entity):
         """Fetch status from router."""
         try:
             rc_value = self.get_ip()
-            rc_record_id = self.check_record_id(self.sub_domain, self.domain);
+            if not rc_value:
+                rc_value = "0.0.0.0"
+
+            rc_record_id = self.check_record_id(self.sub_domain, self.domain)
 
             if rc_record_id < 0:
                 self.add_dns(rc_value)
