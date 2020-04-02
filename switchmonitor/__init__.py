@@ -178,7 +178,7 @@ class SwitchMonitor:
         except Exception as e:
             _LOGGER.error(e)
 
-    async def resume_device(self, item, hass):
+    async def resume_device(self, item, hass, operator):
         """resume the device network."""
         if not item:
             return
@@ -186,13 +186,13 @@ class SwitchMonitor:
         if self.need_further_operation(item):
             fur_switch = hass.states.get(item).attributes.get(self.further_switch_name)
             if(fur_switch):
-                _LOGGER.warning("mqtt turn off device %s" % (fur_switch))
+                _LOGGER.warning("%s turn off device %s" % (operator, fur_switch))
                 await hass.services.async_call("switch", SERVICE_TURN_OFF, {ATTR_ENTITY_ID: fur_switch})
             else:
                 _LOGGER.warning("miss device further infomation %s" % (fur_switch))
             await self.remove_turn_count_dict(item)
         else:
-            _LOGGER.warning("mqtt turn on device %s" % (item))
+            _LOGGER.warning("%s turn on device %s" % (operator, item))
             await hass.services.async_call("switch", SERVICE_TURN_ON, {ATTR_ENTITY_ID: item})
             await self.remove_from_state_off_dict(item)
 
@@ -228,7 +228,7 @@ async def async_setup(hass, config):
                 for item in turn_list:
                     item = item.strip(' \'')
 
-                    await device.resume_device(item, hass)
+                    await device.resume_device(item, hass,"SwitchMonitor")
 
         except Exception as e:
             _LOGGER.error(e)
@@ -249,7 +249,7 @@ async def async_setup(hass, config):
             if not id:
                 return
 
-            await device.resume_device(device.get_device_by_id(id, hass.states), hass)
+            await device.resume_device(device.get_device_by_id(id, hass.states), hass,"mqtt")
 
         except Exception as e:
             _LOGGER.error(e)

@@ -157,6 +157,7 @@ class AsusRouter(AsusWrt):
         self._ssid = ""
         self._last_vpn_restart_time = None
         self._max_offline_setting = None
+        self._wifi_enabled = False
 
     @property
     def device_name(self):
@@ -213,8 +214,16 @@ class AsusRouter(AsusWrt):
         """Return the ssid of the router."""
         return self._ssid
 
+    @property
+    def wifi_enabled(self):
+        """Return if wifi is enabled."""
+        return self._wifi_enabled
+
     async def set_ssid(self, ssid):
         self._ssid = ssid
+
+    async def set_wifi_enabled(self, enabled):
+        self._wifi_enabled = enabled
 
     async def set_add_attribute(self, add_attribute):
         self._add_attribute = add_attribute
@@ -491,6 +500,10 @@ async def async_setup(hass, config):
                         continue
                 
                     if offline_item['id'][0:3] != device_id[1]:
+                        continue
+
+                    if not device.wifi_enabled:
+                        _LOGGER.warning("router %s is not enabled" % (device.device_name))
                         continue
 
                     if device.public_ip == "":

@@ -349,6 +349,11 @@ class AsuswrtSensor(Entity):
             if wifi_states_2g:
                 self._2g_wifi = int(wifi_states_2g[0])
 
+            if self._5g_wifi==1 or self._2g_wifi==1:
+                await self._asusrouter.set_wifi_enabled(True)
+            else:
+                await self._asusrouter.set_wifi_enabled(False)
+
             await self.get_dhcp_clients()
 
             self._connected = True
