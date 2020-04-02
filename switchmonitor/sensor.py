@@ -44,20 +44,6 @@ class SwitchMonitorSensor(Entity):
             'state_off_list': self._check_confirm if self._check_confirm else "",
         }
 
-    def is_wifi_enabled(self, item):
-        """get item wifi state."""
-        try:
-            if item.attributes.get('2.4G_wifi') == '1' :
-                return True
-            if item.attributes.get('5G_wifi') == '1' :
-                return True
-
-            return False
-
-        except  Exception as e:
-            _LOGGER.error(e)
-            return dict()
-
     def get_turn_off_list(self,id_list):
         """Fetch trun off switch."""
         turn_off_dict = dict()
@@ -66,7 +52,7 @@ class SwitchMonitorSensor(Entity):
                 item = self._hass.states.get(device)
                 if not item:
                     continue
-                if not self.is_wifi_enabled(item):
+                if item.state == 'unavailable':
                     continue
                 if item.state != 'on' :
                     turn_off_dict[device] = 1
