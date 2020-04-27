@@ -337,8 +337,8 @@ class AsusRouter(AsusWrt):
             _LOGGER.info("need to disable dns from remote")
 
             cmd = "nvram set wan0_dnsenable_x=0 ; "\
-                "nvram set wan0_dns=%s 114.114.114.114; "\
-                "nvram set wan0_dns2_x=114.114.114.114; "\
+                "nvram set wan0_dns='%s 114.114.114.114'; "\
+                "nvram set wan0_dns2_x='114.114.114.114'; "\
                 "nvram commit ; service restart_wan" % self.host_to_gateway()
 
             await self.run_cmdline(cmd)
