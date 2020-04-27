@@ -267,7 +267,7 @@ class AsuswrtSensor(Entity):
             _LOGGER.error(e)
 
     async def get_dhcp_clients(self):
-        """Get trace router attribute to mqtt."""
+        """Get dhcp clients."""
         try:
             connected_devices = await self._asusrouter.connection.async_run_command(
                 _DHCP_CLIENTS_COMMAND)
@@ -322,6 +322,7 @@ class AsuswrtSensor(Entity):
 
             await self.async_get_wan_state()
             await self.async_get_vpn_client()
+            await self._asusrouter.update_static_routing()
 
             ssid = await self._asusrouter.connection.async_run_command(
                 _WIFI_NAME_CMD)

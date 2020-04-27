@@ -23,6 +23,8 @@ CONF_SSH_KEY = "ssh_key"
 CONF_ADD_ATTR = "add_attribute"
 CONF_PUB_MQTT = "pub_mqtt"
 CONF_SR_HOST_ID = "sr_host_id"
+CONF_SR_CACHING_PROXY = "sr_caching_proxy"
+CONF_SR_HOST_PROXY = "sr_host_proxy"
 CONF_MAX_OFFINE_SETTING = "max_offline_setting"
 CONF_SSID = "ssid"
 CONF_TARGETHOST = "target_host"
@@ -89,6 +91,8 @@ CONFIG_SCHEMA = vol.Schema(
                 vol.Optional(CONF_ADD_ATTR, default=False): cv.boolean,
                 vol.Optional(CONF_PUB_MQTT, default=False): cv.boolean,
                 vol.Optional(CONF_SR_HOST_ID, default=""): cv.string,
+                vol.Optional(CONF_SR_CACHING_PROXY, default=""): cv.string,
+                vol.Optional(CONF_SR_HOST_PROXY, default=""): cv.string,
                 vol.Optional(CONF_MAX_OFFINE_SETTING, default=""): cv.string,
             }
         )
@@ -150,6 +154,8 @@ class AsusRouter(AsusWrt):
         self._add_attribute = False
         self._pub_mqtt = False
         self._sr_host_id = None
+        self._sr_caching_proxy = ""
+        self._sr_host_proxy = ""
         self._vpn_enabled = False
         self._vpn_user = False
         self._vpn_server = False
@@ -158,6 +164,7 @@ class AsusRouter(AsusWrt):
         self._last_vpn_restart_time = None
         self._max_offline_setting = None
         self._wifi_enabled = False
+        self._hass = None
 
     @property
     def device_name(self):
@@ -222,6 +229,9 @@ class AsusRouter(AsusWrt):
     async def set_ssid(self, ssid):
         self._ssid = ssid
 
+    async def set_hass(self, hass):
+        self._hass = hass
+
     async def set_wifi_enabled(self, enabled):
         self._wifi_enabled = enabled
 
@@ -233,6 +243,12 @@ class AsusRouter(AsusWrt):
 
     async def set_sr_host_id(self, sr_host_id):
         self._sr_host_id = sr_host_id
+
+    async def set_caching_proxy(self, sr_caching_proxy):
+        self._sr_caching_proxy = sr_caching_proxy
+
+    async def set_sr_host_proxy(self, sr_host_proxy):
+        self._sr_host_proxy = sr_host_proxy
 
     async def set_vpn_enabled(self, vpn_enable):
         self._vpn_enabled = vpn_enable
@@ -262,6 +278,11 @@ class AsusRouter(AsusWrt):
           return DEFAULT_MAX_OFFINLE
         return int(float(item.state))
 
+
+    async def init_device(self, command_line):
+        await self.run_command(command_line)
+        await self.run_command(_SET_INITED_FLAG_CMD)
+
     async def run_cmdline(self, command_line):
         self._connect_failed = False
         try:
@@ -289,13 +310,43 @@ class AsusRouter(AsusWrt):
         self._last_vpn_restart_time = None
         return False
 
+    def host_to_gateway(self):
+
+        num_list = self._host.split('.')
+        if len(num_list) != 4:
+            return "192.168.2.1"
+
+        return "%s.%s.%s.1" % (num_list[0],num_list[1],num_list[2])
+
     async def reboot(self):
         if self.only_reboot_vpn():
             await self.run_cmdline("service restart_vpncall")
         else:
             await self.run_cmdline("reboot")
-            
 
+    async def disable_auto_dns(self):
+
+        try:
+    
+            dnsenable = await self.connection.async_run_command("nvram get wan0_dnsenable_x")
+            if not dnsenable:
+                return
+            if dnsenable[0] == "0":
+                return
+
+            _LOGGER.info("need to disable dns from remote")
+
+            cmd = "nvram set wan0_dnsenable_x=0 ; "\
+                "nvram set wan0_dns=%s 114.114.114.114; "\
+                "nvram set wan0_dns2_x=114.114.114.114; "\
+                "nvram commit ; service restart_wan" % self.host_to_gateway()
+
+            await self.run_cmdline(cmd)
+
+        except  Exception as e:
+            _LOGGER.error(e)
+            return
+            
     async def run_command(self, command_line):
         await self.run_cmdline(command_line)
 
@@ -330,6 +381,98 @@ class AsusRouter(AsusWrt):
         if cmd:
             await self.run_cmdline(cmd)
 
+    async def get_host_proxy_rt_string(self):
+        """Get host proxy static routing string."""
+        try:
+    
+            if self._sr_host_proxy == "":
+                return ""
+
+            if not self._hass:
+                return ""
+
+            host_ip = self._hass.states.get(self._sr_host_id).attributes.get('record')
+            if host_ip == "":
+                return ""
+
+            return self._sr_host_proxy % (host_ip)
+
+        except  Exception as e:
+            _LOGGER.error(e)
+            return ""
+
+    async def get_static_routing(self):
+        """Get router static routing."""
+        rules = []
+        try:
+    
+            rulelist = await self.connection.async_run_command("nvram get sr_rulelist")
+            if not rulelist:
+                return rules
+
+            rules_split = rulelist[0].split('<')
+
+            for rule in rules_split:
+                if rule.find('>') > 0:
+                    rules.append("<" + rule)
+
+            return rules
+
+        except  Exception as e:
+            _LOGGER.error(e)
+            return []
+
+    async def set_static_routing(self, new_routing):
+        """Get router static routing."""
+        try:
+    
+            if new_routing == "":
+                return rules
+
+            _LOGGER.error("update static routing : " + new_routing)
+
+            await self.run_cmdline(
+                "nvram set sr_enable_x=1 ; nvram set sr_rulelist='%s' ; nvram commit" % (new_routing))
+
+        except  Exception as e:
+            _LOGGER.error(e)
+            return []
+ 
+
+    async def update_static_routing(self):
+        """Get static routing."""
+        try:
+            rulelist_add = []
+
+            if self._sr_caching_proxy != "":
+                rulelist_add.append(self._sr_caching_proxy)
+            host_proxy = await self.get_host_proxy_rt_string()
+            if host_proxy != "":
+                rulelist_add.append(host_proxy)
+
+            if len(rulelist_add) == 0:
+                return
+
+            rules_list = await self.get_static_routing()
+  
+            for rule in rules_list:
+
+                for rule_add in rulelist_add:
+                    if rule_add == rule:
+                        rulelist_add.remove(rule_add)
+                        break
+                    
+            if len(rulelist_add) > 0:
+                rulelist_add.extend(rules_list)
+                rule_add_string = ""
+                for rule_add in rulelist_add:
+                    rule_add_string += rule_add
+
+                await self.set_static_routing(rule_add_string)
+
+        except  Exception as e:
+            _LOGGER.error(e)
+
 
 
 async def async_setup(hass, config):
@@ -350,9 +493,12 @@ async def async_setup(hass, config):
             conf.get(CONF_PASSWORD, ""),
             conf.get(CONF_SSH_KEY, conf.get("pub_key", ""))
         )
+        await router.set_hass(hass)
         await router.set_add_attribute(config[DOMAIN][CONF_ADD_ATTR])
         await router.set_pub_mqtt(config[DOMAIN][CONF_PUB_MQTT])
         await router.set_sr_host_id(config[DOMAIN][CONF_SR_HOST_ID])
+        await router.set_caching_proxy(config[DOMAIN][CONF_SR_CACHING_PROXY])
+        await router.set_sr_host_proxy(config[DOMAIN][CONF_SR_HOST_PROXY])
         await router.set_max_offline_setting(config[DOMAIN][CONF_MAX_OFFINE_SETTING])
 
         routers.append(router)
@@ -394,8 +540,7 @@ async def async_setup(hass, config):
         devices = hass.data[DOMAIN]
         for device in devices:
             if device.host == call.data[CONF_HOST] or call.data[CONF_HOST] == "ALL":
-                await device.run_command(call.data[CONF_COMMAND_LINE])
-                await device.run_command(_SET_INITED_FLAG_CMD)
+                await device.init_device(call.data[CONF_COMMAND_LINE])
 
     hass.services.async_register(
         DOMAIN, SERVICE_INITDEVICE, _init_device, schema=SERVICE_INIT_DEVICE_SCHEMA
@@ -441,6 +586,8 @@ async def async_setup(hass, config):
         for device in devices:
             if device.ssid == param['ssid']:
                 try:
+
+                    await device.disable_auto_dns()
                     await device.set_port_forward(
                         5555,5555,'TCP',param['target']
                     )
