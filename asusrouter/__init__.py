@@ -511,7 +511,7 @@ async def async_setup(hass, config):
                     if device.public_ip == "0.0.0.0":
                         continue
                     
-                    await hass.services.async_call("switchmonitor", "turn_on_device", {"id": device_id[1]})              
+                    await hass.services.async_call("switchmonitor", "turn_on_device", {"id": device_id[1]})
 
             except  Exception as e:
                 _LOGGER.error(e)
@@ -530,6 +530,9 @@ async def async_setup(hass, config):
             
                 if param['id'][0:3] != device_id[1]:
                     continue
+
+                _LOGGER.warning("mqtt change router's (%s)  vpn server to %s" % (device.device_name,
+                    param['server']))
 
                 await device.set_vpn_connect(
                         param['server'],param['username'],
