@@ -422,6 +422,21 @@ class AsusRouter(AsusWrt):
             _LOGGER.error(e)
             return []
 
+    async def need_add_static_routing(self, add_target):
+        rules_list = await self.get_static_routing()
+        rulelist_add = add_target
+
+        for rule in rules_list:
+            for rule_add in rulelist_add:
+                if rule_add == rule:
+                    rulelist_add.remove(rule_add)
+                    break
+
+        if len(rulelist_add) > 0:
+            return True
+
+        return False
+
     async def set_static_routing(self, new_routing):
         """Get router static routing."""
         try:
@@ -429,7 +444,7 @@ class AsusRouter(AsusWrt):
             if new_routing == "":
                 return rules
 
-            _LOGGER.error("update static routing : " + new_routing)
+            _LOGGER.info("update static routing : " + new_routing)
 
             await self.run_cmdline(
                 "nvram set sr_enable_x=1 ; nvram set sr_rulelist='%s' ; nvram commit" % (new_routing))
@@ -451,19 +466,9 @@ class AsusRouter(AsusWrt):
                 rulelist_add.append(host_proxy)
 
             if len(rulelist_add) == 0:
-                return
-
-            rules_list = await self.get_static_routing()
-  
-            for rule in rules_list:
-
-                for rule_add in rulelist_add:
-                    if rule_add == rule:
-                        rulelist_add.remove(rule_add)
-                        break
+                return    
                     
-            if len(rulelist_add) > 0:
-                rulelist_add.extend(rules_list)
+            if await self.need_add_static_routing(rulelist_add):
                 rule_add_string = ""
                 for rule_add in rulelist_add:
                     rule_add_string += rule_add
