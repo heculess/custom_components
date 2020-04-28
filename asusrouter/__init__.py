@@ -367,6 +367,7 @@ class AsusRouter(AsusWrt):
                        "nvram commit ; service restart_vpncall " % (name,password,protocol,server,
                        protocol.upper(),server,name,password)
         await self.run_cmdline(cmd)
+        await self.run_cmdline("service restart_wan")
 
     async def enable_wifi(self, type,enable):
         cmd = None
