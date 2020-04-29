@@ -425,7 +425,7 @@ class AsusRouter(AsusWrt):
 
     async def need_add_static_routing(self, add_target):
         rules_list = await self.get_static_routing()
-        rulelist_add = add_target
+        rulelist_add = list(add_target)
 
         for rule in rules_list:
             for rule_add in rulelist_add:
