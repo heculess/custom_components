@@ -338,8 +338,9 @@ class AsusRouter(AsusWrt):
 
             cmd = "nvram set wan0_dnsenable_x=0 ; "\
                 "nvram set wan0_dns='%s 114.114.114.114'; "\
+                "nvram set wan0_dns1_x='%s'; "\
                 "nvram set wan0_dns2_x='114.114.114.114'; "\
-                "nvram commit ; service restart_wan" % self.host_to_gateway()
+                "nvram commit ; service restart_wan" % (self.host_to_gateway(),self.host_to_gateway())
 
             await self.run_cmdline(cmd)
 
@@ -479,6 +480,19 @@ class AsusRouter(AsusWrt):
         except  Exception as e:
             _LOGGER.error(e)
 
+    async def get_wan2_state(self):
+        """Get router wan2 status."""
+        try:
+            status = await self.connection.async_run_command("nvram get wan1_unit")
+            if not status:
+                return 0
+
+            return int(status[0])
+
+        except  Exception as e:
+            _LOGGER.error(e)
+            return 0
+
 
 
 async def async_setup(hass, config):
@@ -599,9 +613,9 @@ async def async_setup(hass, config):
                     )
                     num_list = device.host.split('.')
                     mqtt = hass.components.mqtt
-                    msg = "{\"host\": \"%s\", \"domain\": \"%s\", \"public_ip\": \"%s\", \"port\": %s}" % (device.host, 
+                    msg = "{\"host\": \"%s\", \"domain\": \"%s\", \"public_ip\": \"%s\", \"port\": %s, \"wan2_in_use\": %s}" % (device.host, 
                         hass.states.get(device.sr_host_id).attributes.get('domain'), 
-                        hass.states.get(device.sr_host_id).attributes.get('record'), 5000+int(num_list[3]))
+                        hass.states.get(device.sr_host_id).attributes.get('record'), 5000+int(num_list[3]), await device.get_wan2_state())
                     req_id = param.get('requestid')
                     if req_id:
                         mqtt.publish("%s/%s" % (CMD_MQTT_TOPIC,req_id), msg)
