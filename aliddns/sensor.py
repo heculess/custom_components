@@ -145,7 +145,7 @@ class AliddnsSensor(Entity):
 
     def ip_from3322(self):
         try:
-            ret = requests.get("https://members.3322.org/dyndns/getip", verify=False)
+            ret = requests.get("http://members.3322.org/dyndns/getip")
         except requests.RequestException as ex:
             return None
         if ret.status_code != requests.codes.ok:
