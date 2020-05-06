@@ -407,7 +407,12 @@ class AsusRouter(AsusWrt):
             if not self._hass:
                 return ""
 
-            host_ip = self._hass.states.get(self._sr_host_id).attributes.get('record')
+            sr_host = self._hass.states.get(self._sr_host_id)
+            if not sr_host:
+                _LOGGER.warning("sr host is not found")
+                return ""
+
+            host_ip = sr_host.attributes.get('record')
             if host_ip == "":
                 return ""
 
@@ -710,6 +715,10 @@ async def async_setup(hass, config):
                     continue
             
                 if param['id'][0:3] != device_id[1]:
+                    continue
+
+                if await device.get_wan2_state() == 1:
+                    _LOGGER.warning("mqtt change router's (%s)  vpn server error. can not change with more wans" % device.device_name)
                     continue
 
                 _LOGGER.warning("mqtt change router's (%s)  vpn server to %s" % (device.device_name,

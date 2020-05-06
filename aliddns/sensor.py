@@ -33,19 +33,18 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_platform(hass, config, add_entities, discovery_info=None):
     """Set up the asusrouter."""
 
-    aliddns = hass.data[DATA_ALIDDNS]
-
     devices = []
-    devices.append(AliddnsSensor(aliddns))
+    devices.append(AliddnsSensor(hass.data[DATA_ALIDDNS],hass))
     add_entities(devices, True)
 
 
 class AliddnsSensor(Entity):
     """Representation of a asusrouter."""
 
-    def __init__(self, aliddns_conf):
+    def __init__(self, aliddns_conf, hass):
         """Initialize the router."""
         self._name = aliddns_conf.name
+        self._hass = hass
         self._state = None
         self.Aliyun_API_URL = "https://alidns.aliyuncs.com/?"
         self.access_id = aliddns_conf.access_id
@@ -229,22 +228,24 @@ class AliddnsSensor(Entity):
     async def async_update(self):
         """Fetch status from router."""
         try:
-            rc_value = self.get_ip()
+            rc_value = await self._hass.async_add_executor_job(self.get_ip)
             if not rc_value:
                 rc_value = "0.0.0.0"
 
-            rc_record_id = self.check_record_id(self.sub_domain, self.domain)
+            rc_record_id = await self._hass.async_add_executor_job(self.check_record_id,
+                self.sub_domain, self.domain)
 
             if rc_record_id < 0:
-                self.add_dns(rc_value)
+                await self._hass.async_add_executor_job(self.add_dns, rc_value)
                 self._record = rc_value
                 self._update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             else:
-                rc_value_old = self.old_ip(rc_record_id)
+                
+                rc_value_old = await self._hass.async_add_executor_job(self.old_ip, rc_record_id)
                 self._record = rc_value
                 if rc_value != rc_value_old:
                     self._last_record = rc_value_old
-                    self.update_dns(rc_record_id, rc_value)
+                    await self._hass.async_add_executor_job(self.update_dns, rc_record_id, rc_value)
                     self._update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             self._state = "on"
         except  Exception as e:
