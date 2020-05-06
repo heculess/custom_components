@@ -502,11 +502,18 @@ class AsusRouter(AsusWrt):
     async def get_wan2_state(self):
         """Get router wan2 status."""
         try:
-            status = await self.connection.async_run_command("nvram get wan1_unit")
+            status = await self.connection.async_run_command("nvram get wans_dualwan")
             if not status:
                 return 0
 
-            return int(status[0])
+            wan_list = status[0].split(' ')
+            if len(wan_list) < 2:
+                return 0
+
+            if wan_list[1] != "none":
+                return 1
+
+            return 0
 
         except  Exception as e:
             _LOGGER.error(e)
