@@ -55,6 +55,7 @@ class AliddnsSensor(Entity):
         self._record = None
         self._last_record = "0.0.0.0"
         self._update_time = ""
+        self._rc_record_id = -1
 
     @property
     def name(self):
@@ -230,21 +231,22 @@ class AliddnsSensor(Entity):
         if not rc_value:
             rc_value = "0.0.0.0"
 
-            rc_record_id = self.check_record_id(self.sub_domain, self.domain)
+        if self._rc_record_id < 0:
+            self._rc_record_id = self.check_record_id(self.sub_domain, self.domain)
 
-            if rc_record_id < 0:
-                self.add_dns(rc_value)
-                self._record = rc_value
+        if self._rc_record_id < 0:
+            self.add_dns(rc_value)
+            self._record = rc_value
+            self._update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            
+            rc_value_old = self.old_ip(self._rc_record_id)
+            self._record = rc_value
+            if rc_value != rc_value_old:
+                self._last_record = rc_value_old
+                self.update_dns(self._rc_record_id, rc_value)
                 self._update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            else:
-                
-                rc_value_old = self.old_ip(rc_record_id)
-                self._record = rc_value
-                if rc_value != rc_value_old:
-                    self._last_record = rc_value_old
-                    self.update_dns(rc_record_id, rc_value)
-                    self._update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            self._state = "on"
+        self._state = "on"
 
     async def async_update(self):
         """Fetch status from router."""
@@ -252,4 +254,5 @@ class AliddnsSensor(Entity):
             await self._hass.async_add_executor_job(self.update_ddns)
         except  Exception as e:
             _LOGGER.error(e)
+            self._rc_record_id = -1
             self._state = "error"
