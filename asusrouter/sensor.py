@@ -304,6 +304,10 @@ class AsuswrtSensor(Entity):
             self._connected = False
 
         try:
+
+            if not self._connected:
+                await self._asusrouter.connection.async_connect()
+
             inited = await self._asusrouter.connection.async_run_command(
                 _ROUTER_IS_INITED_COMMAND)
             if not inited:

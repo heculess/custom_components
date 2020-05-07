@@ -3,7 +3,7 @@
   "name": "asusrouter",
   "documentation": "https://www.home-assistant.io/integrations/asuswrt",
   "requirements": [
-    "aioasuswrt==1.1.22"
+    "aioasuswrt==1.2.5"
   ],
   "dependencies": [
     "mqtt"
