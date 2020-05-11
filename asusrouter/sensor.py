@@ -328,6 +328,9 @@ class AsuswrtSensor(Entity):
             await self.async_get_vpn_client()
             await self._asusrouter.update_static_routing()
 
+            if not self._initialized:
+                await self._asusrouter.init_router()
+
             ssid = await self._asusrouter.connection.async_run_command(
                 _WIFI_NAME_CMD)
             if ssid:

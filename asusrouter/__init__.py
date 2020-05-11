@@ -26,6 +26,7 @@ CONF_SR_HOST_ID = "sr_host_id"
 CONF_SR_CACHING_PROXY = "sr_caching_proxy"
 CONF_SR_HOST_PROXY = "sr_host_proxy"
 CONF_MAX_OFFINE_SETTING = "max_offline_setting"
+CONF_INIT_COMMAND = "init_command"
 CONF_SSID = "ssid"
 CONF_TARGETHOST = "target_host"
 CONF_PORT_EXTER = "external_port"
@@ -94,6 +95,7 @@ CONFIG_SCHEMA = vol.Schema(
                 vol.Optional(CONF_SR_CACHING_PROXY, default=""): cv.string,
                 vol.Optional(CONF_SR_HOST_PROXY, default=""): cv.string,
                 vol.Optional(CONF_MAX_OFFINE_SETTING, default=""): cv.string,
+                vol.Optional(CONF_INIT_COMMAND, default=""): cv.string,
             }
         )
     },
@@ -156,6 +158,7 @@ class AsusRouter(AsusWrt):
         self._sr_host_id = None
         self._sr_caching_proxy = ""
         self._sr_host_proxy = ""
+        self._init_command = ""
         self._vpn_enabled = False
         self._vpn_user = False
         self._vpn_server = False
@@ -265,6 +268,9 @@ class AsusRouter(AsusWrt):
     async def set_max_offline_setting(self, max_offline_setting):
         self._max_offline_setting = max_offline_setting
 
+    async def set_init_command_line(self, command_line):
+        self._init_command = command_line
+
     def get_max_offine(self, hass):
         """get max offine."""
         if not self._max_offline_setting:
@@ -278,6 +284,11 @@ class AsusRouter(AsusWrt):
           return DEFAULT_MAX_OFFINLE
         return int(float(item.state))
 
+    async def init_router(self):
+        if self._init_command == "":
+          return
+
+        await self.init_device(self._init_command)
 
     async def init_device(self, command_line):
         await self.run_command(command_line)
@@ -546,6 +557,7 @@ async def async_setup(hass, config):
         await router.set_caching_proxy(config[DOMAIN][CONF_SR_CACHING_PROXY])
         await router.set_sr_host_proxy(config[DOMAIN][CONF_SR_HOST_PROXY])
         await router.set_max_offline_setting(config[DOMAIN][CONF_MAX_OFFINE_SETTING])
+        await router.set_init_command_line(config[DOMAIN][CONF_INIT_COMMAND])
 
         routers.append(router)
 
