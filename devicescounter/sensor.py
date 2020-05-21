@@ -35,6 +35,7 @@ class DevicesCounterSensor(Entity):
             for device in id_list:
                 item = self._hass.states.get(device)
                 if not item:
+                    _LOGGER.warning("can not find device" + device)
                     continue
                 count = item.attributes.get('client_number')
                 if not count:
