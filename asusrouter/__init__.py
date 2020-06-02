@@ -299,9 +299,12 @@ class AsusRouter(AsusWrt):
 
     def match_device_id(self, device_id):
         """return if match the device_id."""
+        """return if match the device_id."""
+        device_id = device_id.strip()
+
         if not device_id:
           return False
-
+ 
         if not self._device_sn:
             return False
 
@@ -309,8 +312,12 @@ class AsusRouter(AsusWrt):
             if device_id[0:3] == self._device_sn:
                 return True 
         else:
-            if device_id[4:8] == self._device_sn:
-                return True
+            if device_id[0].isdigit():
+                if device_id[0:3] == self._device_sn:
+                    return True 
+            else:
+                if device_id[4:8] == self._device_sn:
+                    return True
 
         return False
 
