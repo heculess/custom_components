@@ -20,6 +20,7 @@ _LOGGER = logging.getLogger(__name__)
 CONF_PUB_KEY = "pub_key"
 CONF_SENSORS = "sensors"
 CONF_SSH_KEY = "ssh_key"
+CONF_USE_TELNET = "use_telnet"
 CONF_ADD_ATTR = "add_attribute"
 CONF_PUB_MQTT = "pub_mqtt"
 CONF_SR_HOST_ID = "sr_host_id"
@@ -78,6 +79,7 @@ ROUTER_CONFIG = vol.Schema(
         vol.Exclusive(CONF_PASSWORD, SECRET_GROUP): cv.string,
         vol.Exclusive(CONF_SSH_KEY, SECRET_GROUP): cv.isfile,
         vol.Exclusive(CONF_PUB_KEY, SECRET_GROUP): cv.isfile,
+        vol.Optional(CONF_USE_TELNET, default=False): cv.boolean,
     }
 )
 
@@ -147,9 +149,9 @@ SERVICE_ENABLE_WIFI_SCHEMA = vol.Schema(
 class AsusRouter(AsusWrt):
     """interface of a asusrouter."""
 
-    def __init__(self, host, port, devicename, username, password, ssh_key):
+    def __init__(self, host, port, use_telnet, devicename, username, password, ssh_key):
         """Init function."""
-        super().__init__(host, port, False, username, password, ssh_key)
+        super().__init__(host, port, use_telnet, username, password, ssh_key)
         self._device_name = devicename
         self._host = host
         self._connect_failed = False
@@ -168,11 +170,22 @@ class AsusRouter(AsusWrt):
         self._max_offline_setting = None
         self._wifi_enabled = False
         self._hass = None
+        self._device_sn = None
+
+        serial_number = self._device_name.split('_', 1)
+        if serial_number:
+            self._device_sn = serial_number[1]
+        
 
     @property
     def device_name(self):
         """Return the device name of the router."""
         return self._device_name
+
+    @property
+    def device_sn(self):
+        """Return the serial number of the router."""
+        return self._device_sn
 
     @property
     def host(self):
@@ -283,6 +296,23 @@ class AsusRouter(AsusWrt):
         if not item:
           return DEFAULT_MAX_OFFINLE
         return int(float(item.state))
+
+    def match_device_id(self, device_id):
+        """return if match the device_id."""
+        if not device_id:
+          return False
+
+        if not self._device_sn:
+            return False
+
+        if device_id.isdigit():
+            if device_id[0:3] == self._device_sn:
+                return True 
+        else:
+            if device_id[4:8] == self._device_sn:
+                return True
+
+        return False
 
     async def init_router(self):
         if self._init_command == "":
@@ -545,6 +575,7 @@ async def async_setup(hass, config):
         router = AsusRouter(
             conf[CONF_HOST],
             conf[CONF_PORT],
+            conf[CONF_USE_TELNET],
             conf[CONF_NAME],
             conf[CONF_USERNAME],
             conf.get(CONF_PASSWORD, ""),
@@ -696,15 +727,11 @@ async def async_setup(hass, config):
             try:
 
                 for device in devices:
-                    device_id = device.device_name.split('_', 1)
 
                     if offline_item['online'] > device.get_max_offine(hass):
                         continue
 
-                    if not device_id:
-                        continue
-                
-                    if offline_item['id'][0:3] != device_id[1]:
+                    if not device.match_device_id(offline_item['id']):
                         continue
 
                     if not device.wifi_enabled:
@@ -716,25 +743,22 @@ async def async_setup(hass, config):
                     if device.public_ip == "0.0.0.0":
                         continue
                     
-                    await hass.services.async_call("switchmonitor", "turn_on_device", {"id": device_id[1]})
+                    await hass.services.async_call("switchmonitor", "turn_on_device", {"id": device.device_sn})
 
             except  Exception as e:
                 _LOGGER.error(e)
 
 
-    async def _chage_vpn_user(msg):
+    async def _change_vpn_user(msg):
         """Handle new MQTT messages."""
         param = json.loads(msg.payload)
         devices = hass.data[DOMAIN]
-        
+
         try:
             for device in devices:
-                device_id = device.device_name.split('_', 1)
-                if not device_id:
-                    continue
-            
-                if param['id'][0:3] != device_id[1]:
-                    continue
+
+                if not device.match_device_id(param['id']):
+                        continue
 
                 if await device.get_wan2_state() == 1:
                     _LOGGER.warning("mqtt change router's (%s)  vpn server error. can not change with more wans" % device.device_name)
@@ -757,7 +781,7 @@ async def async_setup(hass, config):
             await mqtt.async_subscribe("router_monitor/global/commad/get_adbconn_target", _get_adbconn_target)
             await mqtt.async_subscribe("router_monitor/global/commad/get_vpn_account", _get_vpn_account)
             await mqtt.async_subscribe(MQTT_DEVICE_OFFLINE_TOPIC, _device_offline)
-            await mqtt.async_subscribe(MQTT_CHANGE_VPNUSER_TOPIC, _chage_vpn_user)
+            await mqtt.async_subscribe(MQTT_CHANGE_VPNUSER_TOPIC, _change_vpn_user)
 
 
     async def _enable_wifi(call):
