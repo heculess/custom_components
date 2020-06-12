@@ -18,6 +18,9 @@ _CONNECT_STATE_WAN_CMD = 'nvram get wan0_state_t'
 _STATES_WIFI_5G_CMD = 'nvram get wl1_radio'
 _STATES_WIFI_2G_CMD = 'nvram get wl0_radio'
 
+_WIFI_CHANNEL_5G_CMD = 'wl -i eth2 status ; iwlist ath1 channel'
+_WIFI_CHANNEL_2G_CMD = 'wl -i eth1 status ; wlanconfig ath0 list'
+
 _ROUTER_WAN_PROTO_COMMAND = 'nvram get wan0_proto'
 
 _ROUTER_IS_INITED_COMMAND = 'find /etc/inited'
@@ -82,6 +85,8 @@ class AsuswrtSensor(Entity):
         self._mqtt = mqtt
         self._5g_wifi = 0
         self._2g_wifi = 0
+        self._5g_wl_channel = "0"
+        self._2g_wl_channel = "0"
         self._client_number = 0
 
     @property
@@ -93,6 +98,30 @@ class AsuswrtSensor(Entity):
     def connect_state(self):
         """Return the link  state of the router."""
         return self._connect_state
+
+
+    def get_channel_from_line(self, lines):
+        if not lines:
+            return "0"
+
+        line_size = len(lines)
+        if line_size < 4:
+            return "0"
+
+        if lines[0].find("SSID:") >= 0:
+            lines = lines[1].split("	")
+            for line in lines:
+                params = line.split(':')
+                if len(params) > 1 and params[0] == "Channel":
+                    return params[1].strip()
+        else:
+            for line in lines:
+                if line.find("Current Frequency") > 0:
+                    freq_regx = compile(r'(?<=\(Channel )(.+?)(?=\))').findall(line)
+                    if freq_regx:
+                        return freq_regx[0]
+
+        return "0"
 
     async def async_get_bytes_total(self):
         """Retrieve total bytes (rx an tx) from ASUSROUTER."""
@@ -349,13 +378,19 @@ class AsuswrtSensor(Entity):
 
             wifi_states_5g = await self._asusrouter.connection.async_run_command(
                 _STATES_WIFI_5G_CMD)
-            if wifi_states_5g:
+            if wifi_states_5g and wifi_states_5g[0].isdigit():
                 self._5g_wifi = int(wifi_states_5g[0])
 
             wifi_states_2g = await self._asusrouter.connection.async_run_command(
                 _STATES_WIFI_2G_CMD)
-            if wifi_states_2g:
+            if wifi_states_2g and wifi_states_2g[0].isdigit():
                 self._2g_wifi = int(wifi_states_2g[0])
+
+            self._5g_wl_channel = self.get_channel_from_line(await self._asusrouter.connection.async_run_command(
+                _WIFI_CHANNEL_5G_CMD))
+
+            self._2g_wl_channel = self.get_channel_from_line(await self._asusrouter.connection.async_run_command(
+                _WIFI_CHANNEL_2G_CMD))
 
             if self._5g_wifi==1 or self._2g_wifi==1:
                 await self._asusrouter.set_wifi_enabled(True)
@@ -436,7 +471,9 @@ class AsuswrtRouterSensor(AsuswrtSensor):
             'host': self._asusrouter.host,
             'client_number': self._client_number,
             '2.4G_wifi': self._2g_wifi,
+            '2.4G_wifi_channel': self._2g_wl_channel,
             '5G_wifi': self._5g_wifi,
+            '5G_wifi_channel': self._5g_wl_channel,
             'vpn_username': self._ppoe_username,
             'vpn_server': self._ppoe_heartbeat,
             'vpn_proto': self._ppoe_proto,
