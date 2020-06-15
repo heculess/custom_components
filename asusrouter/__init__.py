@@ -307,16 +307,12 @@ class AsusRouter(AsusWrt):
         if not self._device_sn:
             return False
 
-        if device_id.isdigit():
+        if device_id == self._device_name:
+            return True
+
+        if device_id[0].isdigit():
             if device_id[0:3] == self._device_sn:
                 return True 
-        else:
-            if device_id[0].isdigit():
-                if device_id[0:3] == self._device_sn:
-                    return True 
-            else:
-                if device_id[4:8] == self._device_sn:
-                    return True
 
         return False
 
