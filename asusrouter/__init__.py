@@ -171,6 +171,7 @@ class AsusRouter(AsusWrt):
         self._wifi_enabled = False
         self._hass = None
         self._device_sn = None
+        self._device_state = 0
 
         serial_number = self._device_name.split('_', 1)
         if serial_number:
@@ -238,6 +239,11 @@ class AsusRouter(AsusWrt):
         return self._ssid
 
     @property
+    def device_state(self):
+        """Return the state of the router."""
+        return self._device_state
+
+    @property
     def wifi_enabled(self):
         """Return if wifi is enabled."""
         return self._wifi_enabled
@@ -283,6 +289,9 @@ class AsusRouter(AsusWrt):
 
     async def set_init_command_line(self, command_line):
         self._init_command = command_line
+
+    async def set_device_state(self, state):
+        self._device_state = state
 
     def get_max_offine(self, hass):
         """get max offine."""
@@ -705,8 +714,8 @@ async def async_setup(hass, config):
             if device.vpn_user == param['vpn_user']:
                 try:
                     mqtt = hass.components.mqtt
-                    msg = "{\"user\": \"%s\",\"state\": \"inuse\", \"deviceid\": \"%s\", \"server\": \"%s\"}" % (device.vpn_user, 
-                        device.device_name,device.vpn_server)
+                    msg = "{\"user\": \"%s\",\"state\": \"inuse\", \"deviceid\": \"%s\", \"server\": \"%s\", \"connect_state\": \"%s\"}" % (device.vpn_user, 
+                        device.device_name,device.vpn_server,device.device_state)
                     req_id = param.get('requestid')
                     if req_id:
                         mqtt.publish("%s/%s" % (MQTT_VPN_ACCOUNT_TOPIC,req_id), msg)

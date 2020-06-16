@@ -64,7 +64,12 @@ class PowerMonitorSensor(Entity):
             return 0.0
           if item.state != 'on' :
             self._last_power_off = device
-          return float(item.attributes.get(self._power_key))
+
+          power = item.attributes.get(self._power_key)
+          if not power:
+              return 0.0
+
+          return float(power)
         except  Exception as e:
             _LOGGER.error(e)
             return 0.0

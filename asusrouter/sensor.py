@@ -77,7 +77,6 @@ class AsuswrtSensor(Entity):
         self._latest_transfer_check = None
         self._transfer_rates_cache = None
         self._trans_cache_timer = None
-        self._connect_state = 0
         self._latest_transfer_data = 0, 0
         self._ppoe_username = ""
         self._ppoe_heartbeat = ""
@@ -93,12 +92,6 @@ class AsuswrtSensor(Entity):
     def state(self):
         """Return the state of the router."""
         return self._state
-
-    @property
-    def connect_state(self):
-        """Return the link  state of the router."""
-        return self._connect_state
-
 
     def get_channel_from_line(self, lines):
         if not lines:
@@ -199,14 +192,14 @@ class AsuswrtSensor(Entity):
         if not connect:
             return
 
-        self._connect_state = connect[0]
+        await self._asusrouter.set_device_state(connect[0])
         if connect[0] != '2':
             return
 
         if self._asusrouter.vpn_enabled:
             vpn_state = await self._asusrouter.connection.async_run_command("nvram get vpnc_state_t")
             if vpn_state:
-                self._connect_state= vpn_state[0]
+                await self._asusrouter.set_device_state(vpn_state[0])
 
     async def async_get_vpn_client(self):
         if self._asusrouter.vpn_enabled:
@@ -288,7 +281,7 @@ class AsuswrtSensor(Entity):
         try:
             topic = "router_monitor/%s/states" % (self._name)
             data_dict = self.device_state_attributes
-            data_dict.update(state=int(self._connect_state))
+            data_dict.update(state=int(self._asusrouter.device_state))
             data_pub = json.dumps(data_dict)
             self._mqtt.publish(topic, data_pub)
 
@@ -410,7 +403,7 @@ class AsuswrtSensor(Entity):
         except  Exception as e:
             self._connected = False
             if self._asusrouter.connect_failed:
-                self._connect_state = '0'
+                await self._asusrouter.set_device_state('0')
             _LOGGER.error(e)
 
 
@@ -482,7 +475,7 @@ class AsuswrtRouterSensor(AsuswrtSensor):
     async def async_update(self):
         """Fetch new state data for the sensor."""
         await super().async_update()
-        self._state = self._connect_state
+        self._state = self._asusrouter.device_state
 
 
 class RouterWanIpSensor(AsuswrtRouterSensor):
