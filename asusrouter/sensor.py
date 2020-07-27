@@ -281,7 +281,8 @@ class AsuswrtSensor(Entity):
         try:
             topic = "router_monitor/%s/states" % (self._name)
             data_dict = self.device_state_attributes
-            data_dict.update(state=int(self._asusrouter.device_state))
+            if self._asusrouter.device_state.isdigit():
+                data_dict.update(state=int(self._asusrouter.device_state))
             data_pub = json.dumps(data_dict)
             self._mqtt.publish(topic, data_pub)
 

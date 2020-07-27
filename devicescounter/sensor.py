@@ -29,13 +29,18 @@ class DevicesCounterSensor(Entity):
     def state(self):
         return self._state
 
+    @property
+    def unit_of_measurement(self):
+        """Return the unit of measurement."""
+        return " "
+
     def get_devices_count(self,id_list):
         count_total = 0
         try:
             for device in id_list:
                 item = self._hass.states.get(device)
                 if not item:
-                    _LOGGER.warning("can not find device" + device)
+                    _LOGGER.debug("can not find device" + device)
                     continue
                 count = item.attributes.get('client_number')
                 if not count:

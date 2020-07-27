@@ -714,8 +714,8 @@ async def async_setup(hass, config):
             if device.vpn_user == param['vpn_user']:
                 try:
                     mqtt = hass.components.mqtt
-                    msg = "{\"user\": \"%s\",\"state\": \"inuse\", \"deviceid\": \"%s\", \"server\": \"%s\", \"connect_state\": \"%s\"}" % (device.vpn_user, 
-                        device.device_name,device.vpn_server,device.device_state)
+                    msg = "{\"user\": \"%s\",\"state\": \"%s\", \"deviceid\": \"%s\", \"server\": \"%s\", \"connect_state\": \"%s\"}" % (device.vpn_user, 
+                        "inuse" if device.vpn_enabled else "nouse",device.device_name,device.vpn_server,device.device_state)
                     req_id = param.get('requestid')
                     if req_id:
                         mqtt.publish("%s/%s" % (MQTT_VPN_ACCOUNT_TOPIC,req_id), msg)
