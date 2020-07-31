@@ -1,0 +1,8 @@
+select_channel:
+  description: change the device's channel.
+  fields:
+    channel: {description: a channel to change ., example: "HDMI 2"}
+auto_select_channel:
+  description: auto change the device's channel.
+  fields:
+    power: {description: change channel by power ., example: 2.75}
