@@ -12,14 +12,15 @@ from cryptography.hazmat.backends import default_backend
 _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_DISCOVERY_RETRIES = 4
-SOCKET_BUFSIZE = 4096
 
 GATEWAY_MODELS = ['gateway', 'gateway.v3', 'acpartner.v3']
+SOCKET_BUFSIZE = 4096
 MULTICAST_PORT = 9898
 MULTICAST_ADDRESS = '224.0.0.50'
 
 
 def create_mcast_socket(interface, port):
+    """Create and bind a socket for communication."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
@@ -69,8 +70,10 @@ class XiaomiGatewayDiscovery:
     def discover_gateways(self):
         """Discover gateways using multicast"""
 
-        _socket = create_mcast_socket(self._interface, 0)
+        _socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         _socket.settimeout(5.0)
+        if self._interface != 'any':
+            _socket.bind((self._interface, 0))
 
         for gateway in self._gateways_config:
             host = gateway.get('host')
@@ -149,7 +152,7 @@ class XiaomiGatewayDiscovery:
 
         _LOGGER.info('Creating Multicast Socket')
         self._mcastsocket = create_mcast_socket(self._interface, MULTICAST_PORT)
-        self._mcastsocket.settimeout(5.0) # ensure you can exit the _listen_to_msg loop
+        self._mcastsocket.settimeout(5.0)  # ensure you can exit the _listen_to_msg loop
         self._listening = True
         thread = Thread(target=self._listen_to_msg, args=())
         self._threads.append(thread)
@@ -257,17 +260,17 @@ class XiaomiGateway:
                               'motion', 'sensor_motion', 'sensor_motion.aq2',
                               'switch', 'sensor_switch', 'sensor_switch.aq2', 'sensor_switch.aq3', 'remote.b1acn01',
                               '86sw1', 'sensor_86sw1', 'sensor_86sw1.aq1', 'remote.b186acn01',
-                              '86sw2', 'sensor_86sw2', 'sensor_86sw2.aq1', 'remote.b286acn01',
+                              '86sw2', 'sensor_86sw2', 'sensor_86sw2.aq1', 'remote.b286acn01', 'remote.b286acn02',
                               'cube', 'sensor_cube', 'sensor_cube.aqgl01',
                               'smoke', 'sensor_smoke',
                               'natgas', 'sensor_natgas',
                               'sensor_wleak.aq1',
                               'vibration', 'vibration.aq1'],
             'switch': ['plug',
-                       'ctrl_neutral1', 'ctrl_neutral1.aq1',
-                       'ctrl_neutral2', 'ctrl_neutral2.aq1',
-                       'ctrl_ln1', 'ctrl_ln1.aq1',
-                       'ctrl_ln2', 'ctrl_ln2.aq1',
+                       'ctrl_neutral1', 'ctrl_neutral1.aq1', 'switch_b1lacn02',
+                       'ctrl_neutral2', 'ctrl_neutral2.aq1', 'switch_b2lacn02',
+                       'ctrl_ln1', 'ctrl_ln1.aq1', 'switch_b1nacn02',
+                       'ctrl_ln2', 'ctrl_ln2.aq1', 'switch_b2nacn02',
                        '86plug', 'ctrl_86plug', 'ctrl_86plug.aq1'],
             'light': ['gateway', 'gateway.v3'],
             'cover': ['curtain', 'curtain.aq2', 'curtain.hagl04'],
@@ -319,8 +322,11 @@ class XiaomiGateway:
 
     def _send_cmd(self, cmd, rtn_cmd=None):
         try:
-            _socket = create_mcast_socket(self._interface, 0)
+            _socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            if self._interface != 'any':
+                _socket.bind((self._interface, 0))
             _socket.settimeout(10.0)
+            _socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, SOCKET_BUFSIZE)
             _LOGGER.debug("_send_cmd >> %s", cmd.encode())
             _socket.sendto(cmd.encode(), (self.ip_adress, self.port))
             data, _ = _socket.recvfrom(SOCKET_BUFSIZE)
@@ -333,6 +339,7 @@ class XiaomiGateway:
         if data is None:
             _LOGGER.error("No response from Gateway")
             return None
+        _LOGGER.debug("_recv_cmd >> %s", data)
         resp = json.loads(data.decode())
         _LOGGER.debug("_send_cmd resp << %s", resp)
         if rtn_cmd is not None and resp['cmd'] != rtn_cmd:

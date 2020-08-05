@@ -156,7 +156,10 @@ class AliddnsSensor(Entity):
         get_ip_method = popen('curl -s https://pv.sohu.com/cityjson?ie=utf-8')
         if not get_ip_method:
             return None
-        get_ip_responses = get_ip_method.readlines()[0]	
+        buffer_lines = get_ip_method.readlines()
+        if not buffer_lines:
+            return None
+        get_ip_responses = buffer_lines[0]	
         if not get_ip_responses:
             return None
         get_ip_pattern = compile(r'(?<![\.\d])(?:\d{1,3}\.){3}\d{1,3}(?![\.\d])')	
