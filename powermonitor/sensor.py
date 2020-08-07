@@ -61,9 +61,6 @@ class PowerSensor(Entity):
           item = self._hass.states.get(device)
           if not item:
             return 0.0
-          if item.state != 'on' :
-            self._last_power_off = device
-            return 0.0
 
           power = item.attributes.get(self._power_key)
           if not power:

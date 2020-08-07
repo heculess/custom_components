@@ -6,6 +6,15 @@ from homeassistant.helpers.entity import Entity
 from . import SwitchMonitor
 from . import DATA_SWITCHMON
 
+from homeassistant.const import (
+    ATTR_NOW,
+
+    ATTR_ENTITY_ID,
+    SERVICE_TURN_ON,
+
+    EVENT_TIME_CHANGED,
+)
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -26,6 +35,11 @@ class SwitchMonitorSensor(Entity):
         self._name = self._monitor.name
         self._check_confirm = []
         self._hass = hass
+
+        self._last_trigger_stamp = None
+
+        if self._monitor.check_interval > 0 :
+            self._hass.bus.async_listen(EVENT_TIME_CHANGED,self._on_time_change)
 
     @property
     def name(self):
@@ -80,3 +94,34 @@ class SwitchMonitorSensor(Entity):
         except  Exception as e:
             _LOGGER.error(e)
             self._state = "check error"
+
+    async def auto_resume_state(self):
+
+        if not self._check_confirm :
+            return
+        
+        await self._hass.services.async_call(DATA_SWITCHMON, 
+                        "turn_all_on", {"id_list": str(self._check_confirm)})
+
+    async def _on_time_change(self, event):
+        try:
+
+            time_now = event.data.get(ATTR_NOW)
+            if not time_now:
+                return
+
+            if not self._last_trigger_stamp :
+                self._last_trigger_stam = time_now
+                return
+               
+            time_diff = time_now - self._last_trigger_stamp
+            if time_diff.total_seconds() < self._monitor.check_interval:
+                return
+
+            self._last_trigger_stamp = time_now
+            _LOGGER.debug("SwitchMonitorSensor-----------auto_check_state : %s", stamp.strftime("%H:%M:%S"))
+
+            await self.auto_resume_state()
+
+        except Exception as e:
+            _LOGGER.error(e)

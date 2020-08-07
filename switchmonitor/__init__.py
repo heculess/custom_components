@@ -20,6 +20,7 @@ CONF_ID_LIST = 'id_list'
 CONF_ID_DEVICE = 'id'
 CONF_MIN_FUR_CHECK = 'min_fur_check'
 CONF_FUR_SWITCH_NAME = 'fur_switch_name'
+CONF_INTERVALE = 'interval'
 
 DOMAIN = "switchmonitor"
 DATA_SWITCHMON = DOMAIN
@@ -32,6 +33,7 @@ CONFIG_SCHEMA = vol.Schema(
                 vol.Required(CONF_GROUP_ID): cv.string,
                 vol.Optional(CONF_CONFIRM_CHECK,default=5): cv.positive_int,
                 vol.Optional(CONF_MIN_FUR_CHECK,default=3): cv.positive_int,
+                vol.Optional(CONF_INTERVALE,default=300): cv.positive_int,
                 vol.Optional(CONF_FUR_SWITCH_NAME,default=""): cv.string,
             }
         )
@@ -56,6 +58,7 @@ class SwitchMonitor:
         self._min_further_check = min_further_check
         self._further_switch_name = further_switch_name
         self._name = conf_name
+        self._interval = None
         self._state_off_dict = {}
         self._turn_on_count_dict = {}
 
@@ -75,10 +78,17 @@ class SwitchMonitor:
         return self._confirm_check
 
     @property
+    def check_interval(self):
+        """Return the interval"""
+        return self._interval
+
+    @property
     def further_switch_name(self):
         """Return the further switch name of switch"""
         return self._further_switch_name
 
+    def set_auto_check_interval(self, interval):
+        self._interval = interval
 
     def need_further_operation(self, item):
         if not item:
@@ -212,6 +222,8 @@ async def async_setup(hass, config):
             conf[CONF_FUR_SWITCH_NAME],
         )
 
+        hass.data[DATA_SWITCHMON].set_auto_check_interval(conf[CONF_INTERVALE])
+
     hass.async_create_task(
         async_load_platform(hass, "sensor", DOMAIN, {}, config)
     )
@@ -227,7 +239,7 @@ async def async_setup(hass, config):
                 turn_list = id_list.strip('[]').split(',')
                 for item in turn_list:
                     item = item.strip(' \'')
-
+                    _LOGGER.debug("SwitchMonitorSensor-----------turn on devices: %s", item)
                     await device.resume_device(item, hass,"SwitchMonitor")
 
         except Exception as e:
