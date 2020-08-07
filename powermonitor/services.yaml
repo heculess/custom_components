@@ -1,0 +1,4 @@
+turn_all_on:
+  description: turn on the device list.
+  fields:
+    id_list: {description: a list to turn on ., example: "switch.a, switch.b"}
