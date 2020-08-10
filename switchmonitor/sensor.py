@@ -111,7 +111,7 @@ class SwitchMonitorSensor(Entity):
                 return
 
             if not self._last_trigger_stamp :
-                self._last_trigger_stam = time_now
+                self._last_trigger_stamp = time_now
                 return
                
             time_diff = time_now - self._last_trigger_stamp
@@ -119,7 +119,7 @@ class SwitchMonitorSensor(Entity):
                 return
 
             self._last_trigger_stamp = time_now
-            _LOGGER.debug("SwitchMonitorSensor-----------auto_check_state : %s", stamp.strftime("%H:%M:%S"))
+            _LOGGER.debug("SwitchMonitorSensor-----------auto_check_state : %s", time_now.strftime("%H:%M:%S"))
 
             await self.auto_resume_state()
 
