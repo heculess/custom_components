@@ -173,8 +173,10 @@ class AsusRouter(AsusWrt):
         self._device_sn = None
         self._device_state = 0
 
+        self._last_cmd = None
+
         serial_number = self._device_name.split('_', 1)
-        if serial_number:
+        if len(serial_number) > 1:
             self._device_sn = serial_number[1]
         
 
@@ -296,14 +298,14 @@ class AsusRouter(AsusWrt):
     def get_max_offine(self, hass):
         """get max offine."""
         if not self._max_offline_setting:
-          return DEFAULT_MAX_OFFINLE
+            return DEFAULT_MAX_OFFINLE
 
         if self._max_offline_setting == "":
-          return DEFAULT_MAX_OFFINLE
+            return DEFAULT_MAX_OFFINLE
 
         item = hass.states.get(self._max_offline_setting)
         if not item:
-          return DEFAULT_MAX_OFFINLE
+            return DEFAULT_MAX_OFFINLE
         return int(float(item.state))
 
     def match_device_id(self, device_id):
@@ -311,13 +313,13 @@ class AsusRouter(AsusWrt):
         device_id = device_id.strip()
 
         if not device_id:
-          return False
- 
-        if not self._device_sn:
             return False
 
         if device_id == self._device_name:
             return True
+
+        if not self._device_sn:
+            return False
 
         if device_id[0].isdigit():
             if device_id[0:3] == self._device_sn:
@@ -326,8 +328,13 @@ class AsusRouter(AsusWrt):
         return False
 
     async def init_router(self):
+
+        if self._last_cmd :
+            _LOGGER.warning("retry command %s", self._last_cmd)
+            await self.run_cmdline(self._last_cmd)
+
         if self._init_command == "":
-          return
+            return
 
         await self.init_device(self._init_command)
 
@@ -337,8 +344,10 @@ class AsusRouter(AsusWrt):
 
     async def run_cmdline(self, command_line):
         self._connect_failed = False
+        self._last_cmd = command_line
         try:
             await self.connection.async_run_command(command_line)
+            self._last_cmd = None
         except  Exception as e:
             self._connect_failed = True
             _LOGGER.error(e)
@@ -434,7 +443,7 @@ class AsusRouter(AsusWrt):
                        "nvram set vpnc_dnsenable_x=1 ; nvram set vpnc_clientlist='vpn>%s>%s>%s>%s'; "\
                        "nvram commit ; service restart_vpncall ; service restart_wan" % (name,password,protocol,server,
                        protocol.upper(),server,name,password)
-        await self.run_cmdline(cmd)
+        await self.run_cmdline(cmd)    
 
     async def enable_wifi(self, type,enable):
         cmd = None
