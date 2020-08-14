@@ -383,7 +383,7 @@ class AsusRouter(AsusWrt):
 
     async def reboot(self):
         if self.only_reboot_vpn():
-            await self.run_cmdline("service service restart_wan")
+            await self.run_cmdline("service restart_wan")
         else:
             await self.run_cmdline("reboot")
 
