@@ -188,7 +188,9 @@ class AsusRouter(AsusWrt):
     @property
     def device_sn(self):
         """Return the serial number of the router."""
-        return self._device_sn
+        if self._device_sn :
+            return self._device_sn
+        return "sn_%s" % (self._device_name)
 
     @property
     def host(self):
@@ -381,7 +383,7 @@ class AsusRouter(AsusWrt):
 
     async def reboot(self):
         if self.only_reboot_vpn():
-            await self.run_cmdline("service restart_vpncall")
+            await self.run_cmdline("service service restart_wan")
         else:
             await self.run_cmdline("reboot")
 
