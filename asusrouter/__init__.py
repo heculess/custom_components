@@ -383,7 +383,7 @@ class AsusRouter(AsusWrt):
 
     async def reboot(self):
         if self.only_reboot_vpn():
-            await self.run_cmdline("service restart_wan")
+            await self.run_cmdline("service restart_vpncall")
         else:
             await self.run_cmdline("reboot")
 
@@ -472,7 +472,7 @@ class AsusRouter(AsusWrt):
 
             sr_host = self._hass.states.get(self._sr_host_id)
             if not sr_host:
-                _LOGGER.warning("sr host is not found")
+                _LOGGER.debug("sr host is not found")
                 return ""
 
             host_ip = sr_host.attributes.get('record')

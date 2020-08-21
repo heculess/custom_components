@@ -403,6 +403,7 @@ class AsuswrtSensor(Entity):
 
         except  Exception as e:
             self._connected = False
+            await self._asusrouter.set_public_ip("0.0.0.0")
             if self._asusrouter.connect_failed:
                 await self._asusrouter.set_device_state('0')
             _LOGGER.error(e)

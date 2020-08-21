@@ -20,6 +20,7 @@ class DevicesCounterSensor(Entity):
         self._counter = hass.data[DATA_DEVICESCOUNTER]
         self._name = self._counter.name
         self._hass = hass
+        self._state = "0"
 
     @property
     def name(self):
@@ -54,8 +55,12 @@ class DevicesCounterSensor(Entity):
     async def async_update(self):
 
         try:
-            id_list = self._hass.states.get(self._counter.group_id).attributes.get('entity_id')
-            self._state = "%s" % self.get_devices_count(id_list)
+            id_group = self._hass.states.get(self._counter.group_id)
+            if id_group :
+                id_list = id_group.attributes.get('entity_id')
+                self._state = "%s" % self.get_devices_count(id_list)
+            else :
+                _LOGGER.error("can not find group : %s", self._counter.group_id)
 
         except  Exception as e:
             _LOGGER.error(e)
