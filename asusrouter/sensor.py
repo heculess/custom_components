@@ -48,11 +48,17 @@ async def async_setup_platform(hass, config, add_entities, discovery_info=None):
         devices.append(AsuswrtRouterSensor(router.device_name, router, mqtt))
         if router.add_attribute:
             devices.append(RouterWanIpSensor(router.device_name, router))
-            devices.append(RouterConnectStateSensor(router.device_name, router))
+            devices.append(RouterPublicIpSensor(router.device_name, router))
+            devices.append(RouterHostSensor(router.device_name, router))
+            devices.append(RouterClientCountSensor(router.device_name, router))
+            devices.append(RouterInitStateSensor(router.device_name, router))
             devices.append(RouterDownloadSensor(router.device_name, router))
             devices.append(RouterUploadSensor(router.device_name, router))
             devices.append(RouterDownloadSpeedSensor(router.device_name, router))
             devices.append(RouterUploadSpeedSensor(router.device_name, router))
+            devices.append(RouterVpnUsernameSensor(router.device_name, router))
+            devices.append(RouterVpnServerSensor(router.device_name, router))
+            devices.append(RouterVpnProtoSensor(router.device_name, router))
 
     add_entities(devices, True)
 
@@ -488,6 +494,11 @@ class RouterWanIpSensor(AsuswrtRouterSensor):
         """Return the name of the router."""
         return "%s_wan_ip" % (self._name)
 
+    @property
+    def icon(self):
+        """Return the icon to use for device if any."""
+        return "mdi:ip"
+
     @property  
     def device_state_attributes(self):
         """Return the state attributes."""	
@@ -498,13 +509,18 @@ class RouterWanIpSensor(AsuswrtRouterSensor):
         await super().async_update()
         self._state = self._wan_ip
 
-class RouterConnectStateSensor(AsuswrtRouterSensor):
+class RouterPublicIpSensor(AsuswrtRouterSensor):
     """This is the interface class."""
 
     @property
     def name(self):
         """Return the name of the router."""
-        return "%s_connect_state" % (self._name)
+        return "%s_public_ip" % (self._name)
+
+    @property
+    def icon(self):
+        """Return the icon to use for device if any."""
+        return "mdi:ip-network"
 
     @property  
     def device_state_attributes(self):
@@ -514,7 +530,81 @@ class RouterConnectStateSensor(AsuswrtRouterSensor):
     async def async_update(self):
         """Fetch new state data for the sensor."""
         await super().async_update()
-        self._state = self._connected
+        self._state = self._asusrouter.public_ip
+
+class RouterHostSensor(AsuswrtRouterSensor):
+    """This is the interface class."""
+
+    @property
+    def name(self):
+        """Return the name of the router."""
+        return "%s_host" % (self._name)
+
+    @property
+    def icon(self):
+        """Return the icon to use for device if any."""
+        return "mdi:ip"
+
+    @property  
+    def device_state_attributes(self):
+        """Return the state attributes."""	
+        return {}
+
+    async def async_update(self):
+        """Fetch new state data for the sensor."""
+        await super().async_update()
+        self._state = self._asusrouter.host
+
+class RouterClientCountSensor(AsuswrtRouterSensor):
+    """This is the interface class."""
+
+    @property
+    def name(self):
+        """Return the name of the router."""
+        return "%s_client_count" % (self._name)
+
+    @property
+    def icon(self):
+        """Return the icon to use for device if any."""
+        return "mdi:magnify-plus"
+
+    @property
+    def unit_of_measurement(self):
+        """Return the unit of measurement."""
+        return " "
+
+    @property  
+    def device_state_attributes(self):
+        """Return the state attributes."""	
+        return {}
+
+    async def async_update(self):
+        """Fetch new state data for the sensor."""
+        await super().async_update()
+        self._state = self._client_number
+
+class RouterInitStateSensor(AsuswrtRouterSensor):
+    """This is the interface class."""
+
+    @property
+    def name(self):
+        """Return the name of the router."""
+        return "%s_init_state" % (self._name)
+
+    @property
+    def icon(self):
+        """Return the icon to use for device if any."""
+        return "mdi:check-circle"
+
+    @property  
+    def device_state_attributes(self):
+        """Return the state attributes."""	
+        return {}
+
+    async def async_update(self):
+        """Fetch new state data for the sensor."""
+        await super().async_update()
+        self._state = self._initialized
 
 class RouterDownloadSensor(AsuswrtRouterSensor):
     """This is the interface class."""
@@ -523,6 +613,11 @@ class RouterDownloadSensor(AsuswrtRouterSensor):
     def name(self):
         """Return the name of the router."""
         return "%s_download" % (self._name)
+
+    @property
+    def icon(self):
+        """Return the icon to use for device if any."""
+        return "mdi:chart-pie"
 
     @property
     def unit_of_measurement(self):
@@ -548,6 +643,11 @@ class RouterUploadSensor(AsuswrtRouterSensor):
         return "%s_upload" % (self._name)
 
     @property
+    def icon(self):
+        """Return the icon to use for device if any."""
+        return "mdi:chart-pie"
+
+    @property
     def unit_of_measurement(self):
         """Return the unit of measurement."""
         return "GiB"
@@ -560,6 +660,7 @@ class RouterUploadSensor(AsuswrtRouterSensor):
     async def async_update(self):
         """Fetch new state data for the sensor."""
         await super().async_update()
+        setattr(self, "_icon", 'mdi:chart-pie')
         self._state =  super().upload
 
 class RouterDownloadSpeedSensor(AsuswrtRouterSensor):
@@ -573,7 +674,12 @@ class RouterDownloadSpeedSensor(AsuswrtRouterSensor):
     @property
     def unit_of_measurement(self):
         """Return the unit of measurement."""
-        return "'KiB/s"
+        return "KiB/s"
+
+    @property
+    def icon(self):
+        """Return the icon to use for device if any."""
+        return "mdi:download"
 
     @property  
     def device_state_attributes(self):
@@ -596,7 +702,12 @@ class RouterUploadSpeedSensor(AsuswrtRouterSensor):
     @property
     def unit_of_measurement(self):
         """Return the unit of measurement."""
-        return "'KiB/s"
+        return "KiB/s"
+
+    @property
+    def icon(self):
+        """Return the icon to use for device if any."""
+        return "mdi:upload"
 
     @property  
     def device_state_attributes(self):
@@ -607,3 +718,72 @@ class RouterUploadSpeedSensor(AsuswrtRouterSensor):
         """Fetch new state data for the sensor."""
         await super().async_update()
         self._state =  super().upload_speed
+
+class RouterVpnUsernameSensor(AsuswrtRouterSensor):
+    """This is the interface class."""
+
+    @property
+    def name(self):
+        """Return the name of the router."""
+        return "%s_vpn_username" % (self._name)
+
+    @property
+    def icon(self):
+        """Return the icon to use for device if any."""
+        return "mdi:account"
+
+    @property  
+    def device_state_attributes(self):
+        """Return the state attributes."""	
+        return {}
+
+    async def async_update(self):
+        """Fetch new state data for the sensor."""
+        await super().async_update()
+        self._state = self._ppoe_username
+
+class RouterVpnServerSensor(AsuswrtRouterSensor):
+    """This is the interface class."""
+
+    @property
+    def name(self):
+        """Return the name of the router."""
+        return "%s_vpn_server" % (self._name)
+
+    @property
+    def icon(self):
+        """Return the icon to use for device if any."""
+        return "mdi:sitemap"
+
+    @property  
+    def device_state_attributes(self):
+        """Return the state attributes."""	
+        return {}
+
+    async def async_update(self):
+        """Fetch new state data for the sensor."""
+        await super().async_update()
+        self._state = self._ppoe_heartbeat
+
+class RouterVpnProtoSensor(AsuswrtRouterSensor):
+    """This is the interface class."""
+
+    @property
+    def name(self):
+        """Return the name of the router."""
+        return "%s_vpn_proto" % (self._name)
+
+    @property
+    def icon(self):
+        """Return the icon to use for device if any."""
+        return "mdi:protocol"
+
+    @property  
+    def device_state_attributes(self):
+        """Return the state attributes."""	
+        return {}
+
+    async def async_update(self):
+        """Fetch new state data for the sensor."""
+        await super().async_update()
+        self._state = self._ppoe_proto
