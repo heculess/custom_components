@@ -75,8 +75,8 @@ class AsuswrtSensor(Entity):
         self._reboot = asusrouter.reboot
         self._wan_ip = "0.0.0.0"
         self._state = None
-        self._rates = 0.0
-        self._speed = 0.0
+        self._rates = None
+        self._speed = None
         self._rx_latest = None
         self._tx_latest = None
         self._cache_time = CHANGE_TIME_CACHE_DEFAULT
@@ -431,28 +431,28 @@ class AsuswrtRouterSensor(AsuswrtSensor):
     @property
     def download(self):
         """Return the total download."""
-        if self._rates:
+        if self._rates and len(self._rates) > 0:
             return round(self._rates[0]/1000000000, 2)
         return 0
 
     @property
     def upload(self):
         """Return the total upload."""
-        if self._rates:
+        if self._rates and len(self._rates) > 1 and self._rates[1]:
             return round(self._rates[1]/1000000000, 2)
         return 0
 
     @property
     def download_speed(self):
         """Return the download speed."""
-        if self._speed:
+        if self._speed and len(self._speed) > 0:
             return round(self._speed[0]/1000, 2)
         return 0
 
     @property
     def upload_speed(self):
         """Return the upload speed."""
-        if self._speed:
+        if self._speed and len(self._speed) > 1 and self._speed[1]:
             return round(self._speed[1]/1000, 2)
         return 0
       

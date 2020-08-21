@@ -693,7 +693,8 @@ async def async_setup(hass, config):
         """Handle new MQTT messages."""
         param = json.loads(msg.payload)
         devices = hass.data[DOMAIN]
-
+        _LOGGER.debug("mqtt get adb connect information")
+        _LOGGER.debug(param)
         for device in devices:
             if device.ssid == param['ssid']:
                 try:
@@ -720,7 +721,8 @@ async def async_setup(hass, config):
         """Handle new MQTT messages."""
         param = json.loads(msg.payload)
         devices = hass.data[DOMAIN]
-
+        _LOGGER.debug("mqtt get vpn settings")
+        _LOGGER.debug(param)
         for device in devices:
             if device.vpn_user == param['vpn_user']:
                 try:
@@ -741,7 +743,8 @@ async def async_setup(hass, config):
         param = json.loads(msg.payload)
         devices = hass.data[DOMAIN]
         offline_list = param['offline_list']
-
+        _LOGGER.debug("mqtt try to resume devices")
+        _LOGGER.debug(param)
         if not offline_list:
             return
 
@@ -775,7 +778,8 @@ async def async_setup(hass, config):
         """Handle new MQTT messages."""
         param = json.loads(msg.payload)
         devices = hass.data[DOMAIN]
-
+        _LOGGER.debug("mqtt change vpn connect setting")
+        _LOGGER.debug(param)
         try:
             for device in devices:
 
@@ -797,13 +801,13 @@ async def async_setup(hass, config):
         except  Exception as e:
             _LOGGER.error(e)
 
-    if config[DOMAIN][CONF_PUB_MQTT]:
-        mqtt = hass.components.mqtt
-        if mqtt:
-            await mqtt.async_subscribe("router_monitor/global/commad/get_adbconn_target", _get_adbconn_target)
-            await mqtt.async_subscribe("router_monitor/global/commad/get_vpn_account", _get_vpn_account)
-            await mqtt.async_subscribe(MQTT_DEVICE_OFFLINE_TOPIC, _device_offline)
-            await mqtt.async_subscribe(MQTT_CHANGE_VPNUSER_TOPIC, _change_vpn_user)
+    mqtt = hass.components.mqtt
+    if mqtt:
+        _LOGGER.debug("subscribe mqtt topic")
+        await mqtt.async_subscribe("router_monitor/global/commad/get_adbconn_target", _get_adbconn_target)
+        await mqtt.async_subscribe("router_monitor/global/commad/get_vpn_account", _get_vpn_account)
+        await mqtt.async_subscribe(MQTT_DEVICE_OFFLINE_TOPIC, _device_offline)
+        await mqtt.async_subscribe(MQTT_CHANGE_VPNUSER_TOPIC, _change_vpn_user)
 
 
     async def _enable_wifi(call):
