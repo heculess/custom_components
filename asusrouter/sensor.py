@@ -47,7 +47,7 @@ async def async_setup_platform(hass, config, add_entities, discovery_info=None):
     for router in asusrouters:
         devices.append(AsuswrtRouterSensor(router.device_name, router, mqtt))
         if router.add_attribute:
-            devices.append(RouterWanIpSensor(router.device_name, router))
+#            devices.append(RouterWanIpSensor(router.device_name, router))
             devices.append(RouterPublicIpSensor(router.device_name, router))
             devices.append(RouterHostSensor(router.device_name, router))
             devices.append(RouterClientCountSensor(router.device_name, router))
