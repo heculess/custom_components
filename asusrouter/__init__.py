@@ -4,14 +4,19 @@ import json
 import voluptuous as vol
 
 from homeassistant.const import (
+    ATTR_NOW,
+
     CONF_NAME,
     CONF_HOST,
     CONF_PASSWORD,
     CONF_USERNAME,
     CONF_PORT,
+
+    EVENT_TIME_CHANGED,
 )
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.discovery import async_load_platform
+from homeassistant.util import dt as dt_util
 from aioasuswrt.asuswrt import AsusWrt
 from datetime import datetime
 
@@ -50,6 +55,7 @@ CONF_NAME_5GWIFI = '5g'
 DEFAULT_RETRY = 3
 
 DOMAIN = "asusrouter"
+DOMAIN_MQTT_PUB = "asusrouter_mqtt_pub"
 CONF_ROUTERS = "routers"
 DATA_ASUSWRT = DOMAIN
 DEFAULT_SSH_PORT = 22
@@ -59,6 +65,7 @@ CMD_MQTT_TOPIC = "router_monitor/global/commad/on_get_adbconn_target"
 MQTT_VPN_ACCOUNT_TOPIC = "router_monitor/global/commad/on_get_vpn_account"
 MQTT_DEVICE_OFFLINE_TOPIC = "router_monitor/global/commad/device_offline"
 MQTT_CHANGE_VPNUSER_TOPIC = "router_monitor/global/commad/change_vpn_account"
+MQTT_STATES_UPDATE_TOPIC = "router_monitor/global/states/update"
 
 SERVICE_REBOOT = "reboot"
 SERVICE_RUNCOMMAND = "run_command"
@@ -145,6 +152,60 @@ SERVICE_ENABLE_WIFI_SCHEMA = vol.Schema(
             [CONF_NAME_2GWIFI, CONF_NAME_5GWIFI]),
     }
 )
+
+class AsusWrtMqttPub:
+    def __init__(self, hass, publish):
+        self._hass = hass
+        self._need_publish = publish
+        self._mqtt = hass.components.mqtt
+        self._last_pub_time = dt_util.utcnow()
+        self._last_pub_states = {}
+        self._router_state = {}
+
+        self._hass.bus.async_listen(EVENT_TIME_CHANGED,self._on_time_change)
+
+    def update_router_state(self, name, states):
+        self._router_state[name] = states
+
+    
+    async def _on_time_change(self, event):
+        try:
+            time_now = event.data.get(ATTR_NOW)
+            if not time_now:
+                return
+
+            time_diff = time_now - self._last_pub_time
+            if time_diff.total_seconds() < 60 :
+                return
+
+            if self._need_publish :
+                
+                mqtt_publish = {}
+                for key,value in self._router_state.items():
+
+                    update_state = False
+                    if key in self._last_pub_states:
+                        if value != self._last_pub_states[key] :
+                            update_state = True  
+                    else :
+                        update_state = True
+
+                    if update_state :
+                        self._last_pub_states[key] = value
+                        mqtt_publish[key] = value
+
+                states =  json.dumps(mqtt_publish)
+                _LOGGER.debug("mqtt publish routers states")
+                _LOGGER.debug(time_now)
+                _LOGGER.debug(states)
+                    
+                self._mqtt.publish(MQTT_STATES_UPDATE_TOPIC,states)
+
+            self._last_pub_time = time_now
+
+        except Exception as e:
+            _LOGGER.error(e)
+
 
 class AsusRouter(AsusWrt):
     """interface of a asusrouter."""
@@ -296,6 +357,9 @@ class AsusRouter(AsusWrt):
 
     async def set_device_state(self, state):
         self._device_state = state
+
+    async def pub_device_state(self, name, state):
+        self._hass.data[DOMAIN_MQTT_PUB].update_router_state(name,state)
 
     def get_max_offine(self, hass):
         """get max offine."""
@@ -615,6 +679,7 @@ async def async_setup(hass, config):
         routers.append(router)
 
     hass.data[DATA_ASUSWRT] = routers
+    hass.data[DOMAIN_MQTT_PUB] = AsusWrtMqttPub(hass,config[DOMAIN][CONF_PUB_MQTT])
 
     hass.async_create_task(
         async_load_platform(hass, "sensor", DOMAIN, {}, config)

@@ -42,10 +42,9 @@ async def async_setup_platform(hass, config, add_entities, discovery_info=None):
     """Set up the asusrouter."""
 
     asusrouters = hass.data[DATA_ASUSWRT]
-    mqtt = hass.components.mqtt
     devices = []
     for router in asusrouters:
-        devices.append(AsuswrtRouterSensor(router.device_name, router, mqtt))
+        devices.append(AsuswrtRouterSensor(router.device_name, router))
         if router.add_attribute:
 #            devices.append(RouterWanIpSensor(router.device_name, router))
             devices.append(RouterPublicIpSensor(router.device_name, router))
@@ -66,13 +65,12 @@ async def async_setup_platform(hass, config, add_entities, discovery_info=None):
 class AsuswrtSensor(Entity):
     """Representation of a asusrouter."""
 
-    def __init__(self, name, asusrouter, mqtt = None):
+    def __init__(self, name, asusrouter):
         """Initialize the router."""
         self._name = name
         self._connected = False
         self._initialized = False
         self._asusrouter = asusrouter
-        self._reboot = asusrouter.reboot
         self._wan_ip = "0.0.0.0"
         self._state = None
         self._rates = None
@@ -87,7 +85,6 @@ class AsuswrtSensor(Entity):
         self._ppoe_username = ""
         self._ppoe_heartbeat = ""
         self._ppoe_proto = _CONF_VPN_PROTO_DEFAULE
-        self._mqtt = mqtt
         self._5g_wifi = 0
         self._2g_wifi = 0
         self._5g_wl_channel = "0"
@@ -277,21 +274,11 @@ class AsuswrtSensor(Entity):
 
     async def pub_data_mqtt(self):
         """Get trace router attribute to mqtt."""
-        if not self._asusrouter.pub_mqtt:
-            return
-
-        if not self._mqtt:
-            _LOGGER.error("can not find mqtt")
-            return
-
         try:
-            topic = "router_monitor/%s/states" % (self._name)
             data_dict = self.device_state_attributes
             if self._asusrouter.device_state.isdigit():
                 data_dict.update(state=int(self._asusrouter.device_state))
-            data_pub = json.dumps(data_dict)
-            self._mqtt.publish(topic, data_pub)
-
+            await self._asusrouter.pub_device_state(self._name,json.dumps(data_dict))
         except  Exception as e:
             _LOGGER.error(e)
 
