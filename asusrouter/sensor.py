@@ -43,10 +43,10 @@ async def async_setup_platform(hass, config, add_entities, discovery_info=None):
 
     asusrouters = hass.data[DATA_ASUSWRT]
     devices = []
+    
     for router in asusrouters:
         devices.append(AsuswrtRouterSensor(router.device_name, router))
         if router.add_attribute:
-#            devices.append(RouterWanIpSensor(router.device_name, router))
             devices.append(RouterPublicIpSensor(router.device_name, router))
             devices.append(RouterHostSensor(router.device_name, router))
             devices.append(RouterClientCountSensor(router.device_name, router))
@@ -59,6 +59,9 @@ async def async_setup_platform(hass, config, add_entities, discovery_info=None):
             devices.append(RouterVpnServerSensor(router.device_name, router))
             devices.append(RouterVpnProtoSensor(router.device_name, router))
 
+    devices.append(ClientCounterSensor(hass))
+    devices.append(NetworkDownloadSpeedSensor(hass))
+    devices.append(NetworkUploadSpeedSensor(hass))
     add_entities(devices, True)
 
 
@@ -89,7 +92,6 @@ class AsuswrtSensor(Entity):
         self._2g_wifi = 0
         self._5g_wl_channel = "0"
         self._2g_wl_channel = "0"
-        self._client_number = 0
 
     @property
     def state(self):
@@ -278,7 +280,7 @@ class AsuswrtSensor(Entity):
             data_dict = self.device_state_attributes
             if self._asusrouter.device_state.isdigit():
                 data_dict.update(state=int(self._asusrouter.device_state))
-            await self._asusrouter.pub_device_state(self._name,json.dumps(data_dict))
+            await self._asusrouter.pub_device_state(self._name, data_dict)
         except  Exception as e:
             _LOGGER.error(e)
 
@@ -288,7 +290,7 @@ class AsuswrtSensor(Entity):
             connected_devices = await self._asusrouter.connection.async_run_command(
                 _DHCP_CLIENTS_COMMAND)
             if  not connected_devices:
-                self._client_number = 0
+                await self._asusrouter.set_client_number(0)
                 return
 
             dict_arp = dict()
@@ -309,8 +311,7 @@ class AsuswrtSensor(Entity):
 
                 if ip_regx[0] in dict_arp:
                     client_count  += 1
-
-            self._client_number = client_count
+            await self._asusrouter.set_client_number(client_count)
         except  Exception as e:
             _LOGGER.error(e)
 
@@ -362,6 +363,16 @@ class AsuswrtSensor(Entity):
                     self._rates = await self.async_get_bytes_total()
                     self._speed = await self.async_get_current_transfer_rates()
                     await self.async_get_ppoe_vpn()
+
+                if self._speed and len(self._speed) > 0:
+                    await self._asusrouter.set_download_speed(round(self._speed[0]/1000, 2))
+                else:
+                    await self._asusrouter.set_download_speed(0.00)
+
+                if self._speed and len(self._speed) > 1 and self._speed[1]:
+                    await self._asusrouter.set_upload_speed(round(self._speed[1]/1000, 2))
+                else:
+                    await self._asusrouter.set_upload_speed(0.00)
 
             wifi_states_5g = await self._asusrouter.connection.async_run_command(
                 _STATES_WIFI_5G_CMD)
@@ -428,20 +439,6 @@ class AsuswrtRouterSensor(AsuswrtSensor):
         if self._rates and len(self._rates) > 1 and self._rates[1]:
             return round(self._rates[1]/1000000000, 2)
         return 0
-
-    @property
-    def download_speed(self):
-        """Return the download speed."""
-        if self._speed and len(self._speed) > 0:
-            return round(self._speed[0]/1000, 2)
-        return 0
-
-    @property
-    def upload_speed(self):
-        """Return the upload speed."""
-        if self._speed and len(self._speed) > 1 and self._speed[1]:
-            return round(self._speed[1]/1000, 2)
-        return 0
       
     @property  
     def device_state_attributes(self):
@@ -452,12 +449,12 @@ class AsuswrtRouterSensor(AsuswrtSensor):
             'public_ip': self._asusrouter.public_ip,
             'download': self.download,
             'upload': self.upload,
-            'download_speed': self.download_speed,
-            'upload_speed': self.upload_speed,
+            'download_speed': self._asusrouter.download_speed,
+            'upload_speed': self._asusrouter.upload_speed,
             'connect_state': self._connected,
             'ssid': self._asusrouter.ssid,
             'host': self._asusrouter.host,
-            'client_number': self._client_number,
+            'client_number': self._asusrouter.client_number,
             '2.4G_wifi': self._2g_wifi,
             '2.4G_wifi_channel': self._2g_wl_channel,
             '5G_wifi': self._5g_wifi,
@@ -568,7 +565,7 @@ class RouterClientCountSensor(AsuswrtRouterSensor):
     async def async_update(self):
         """Fetch new state data for the sensor."""
         await super().async_update()
-        self._state = self._client_number
+        self._state = self._asusrouter.client_number
 
 class RouterInitStateSensor(AsuswrtRouterSensor):
     """This is the interface class."""
@@ -676,7 +673,7 @@ class RouterDownloadSpeedSensor(AsuswrtRouterSensor):
     async def async_update(self):
         """Fetch new state data for the sensor."""
         await super().async_update()
-        self._state =  super().download_speed
+        self._state =  self._asusrouter.download_speed
 
 class RouterUploadSpeedSensor(AsuswrtRouterSensor):
     """This is the interface class."""
@@ -704,7 +701,7 @@ class RouterUploadSpeedSensor(AsuswrtRouterSensor):
     async def async_update(self):
         """Fetch new state data for the sensor."""
         await super().async_update()
-        self._state =  super().upload_speed
+        self._state =  self._asusrouter.upload_speed
 
 class RouterVpnUsernameSensor(AsuswrtRouterSensor):
     """This is the interface class."""
@@ -774,3 +771,120 @@ class RouterVpnProtoSensor(AsuswrtRouterSensor):
         """Fetch new state data for the sensor."""
         await super().async_update()
         self._state = self._ppoe_proto
+
+class ClientCounterSensor(Entity):
+    def __init__(self, hass):
+        """Initialize the router."""
+        self._hass = hass
+        self._state = "0"
+
+    @property
+    def name(self):
+        return "devices_counter"
+
+    @property
+    def state(self):
+        return self._state
+
+    @property
+    def unit_of_measurement(self):
+        """Return the unit of measurement."""
+        return " "
+
+    def get_devices_count(self):
+        count_total = 0
+        try:
+            devices = self._hass.data[DATA_ASUSWRT]
+            for device in devices:
+                count_total += device.client_number
+
+            return count_total
+        except  Exception as e:
+            _LOGGER.error(e)
+            return dict()
+
+    async def async_update(self):
+
+        try:
+            self._state = "%s" % self.get_devices_count()
+        except  Exception as e:
+            _LOGGER.error(e)
+            self._state = "not count"
+
+class NetworkUploadSpeedSensor(Entity):
+    def __init__(self, hass):
+        """Initialize the router."""
+        self._hass = hass
+        self._state = "0"
+
+    @property
+    def name(self):
+        return "network_upload_monitor"
+
+    @property
+    def state(self):
+        return self._state
+
+    @property
+    def unit_of_measurement(self):
+        """Return the unit of measurement."""
+        return "KiB/s"
+
+    def get_speed(self):
+        count_total = 0.0
+        try:
+            devices = self._hass.data[DATA_ASUSWRT]
+            for device in devices:
+                count_total += device.download_speed
+
+            return count_total
+        except  Exception as e:
+            _LOGGER.error(e)
+            return dict()
+
+    async def async_update(self):
+
+        try:
+            self._state = "%s" % round(self.get_speed(),2)
+        except  Exception as e:
+            _LOGGER.error(e)
+            self._state = "not count"
+
+class NetworkDownloadSpeedSensor(Entity):
+    def __init__(self, hass):
+        """Initialize the router."""
+        self._hass = hass
+        self._state = "0"
+
+    @property
+    def name(self):
+        return "network_download_monitor"
+
+    @property
+    def state(self):
+        return self._state
+
+    @property
+    def unit_of_measurement(self):
+        """Return the unit of measurement."""
+        return "KiB/s"
+
+    def get_speed(self):
+        count_total = 0.0
+        try:
+            devices = self._hass.data[DATA_ASUSWRT]
+            for device in devices:
+                count_total += device.upload_speed
+
+            return count_total
+        except  Exception as e:
+            _LOGGER.error(e)
+            return dict()
+
+    async def async_update(self):
+
+        try:
+            self._state = "%s" % round(self.get_speed(),2)
+        except  Exception as e:
+            _LOGGER.error(e)
+            self._state = "not count"
