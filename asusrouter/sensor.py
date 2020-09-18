@@ -835,7 +835,7 @@ class NetworkUploadSpeedSensor(Entity):
         try:
             devices = self._hass.data[DATA_ASUSWRT]
             for device in devices:
-                count_total += device.download_speed
+                count_total += device.upload_speed
 
             return count_total
         except  Exception as e:
@@ -874,7 +874,7 @@ class NetworkDownloadSpeedSensor(Entity):
         try:
             devices = self._hass.data[DATA_ASUSWRT]
             for device in devices:
-                count_total += device.upload_speed
+                count_total += device.download_speed
 
             return count_total
         except  Exception as e:
