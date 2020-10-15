@@ -234,14 +234,15 @@ class AsuswrtSensor(Entity):
 
             ip_content = await self._asusrouter.connection.async_run_command('cat getip')
             if ip_content:
-                for content in ip_content:
-                    ip_regx = compile(r'(?<=<code>)[\s\S]*?(?=<\/code>)').findall(content)
+                ip_split = ip_content[0].split('：')
+                if len(ip_split) > 2:
+                    ip_regx = _IP_REGEX.findall(ip_split[1])
                     if ip_regx:
-                        public_ip = "%s    %s" % (ip_regx[0],ip_regx[1])
+                        public_ip = "%s    %s" % (ip_regx[0],ip_split[2])
+
             await self._asusrouter.connection.async_run_command('rm getip')
             await self._asusrouter.connection.async_run_command(
-                "wget  -q --no-check-certificate -b --header='User-Agent: \
-                Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko' -O getip ip.cn")
+                "wget  -q -T 20 -b -O getip myip.ipip.net")
 
             if not public_ip:
                 ip_content = await self._asusrouter.connection.async_run_command('cat getip1')
@@ -254,7 +255,7 @@ class AsuswrtSensor(Entity):
                             public_ip = "%s    %s" % (ip_from_dict,ip_dict.get('cname'))
             await self._asusrouter.connection.async_run_command('rm getip1')
             await self._asusrouter.connection.async_run_command(
-                'wget -q -b -O getip1 pv.sohu.com/cityjson?ie=utf-8')
+                'wget -q -T 20 -b -O getip1 pv.sohu.com/cityjson?ie=utf-8')
 
             if not public_ip:
                 ip_content = await self._asusrouter.connection.async_run_command('cat getip2')
@@ -264,7 +265,7 @@ class AsuswrtSensor(Entity):
                         public_ip = ip_regx[0]
             await self._asusrouter.connection.async_run_command('rm getip2')
             await self._asusrouter.connection.async_run_command(
-                'wget -q -b -O getip2 members.3322.org/dyndns/getip')
+                'wget -q -T 20 -b -O getip2 members.3322.org/dyndns/getip')
 
         except  Exception as e:
             _LOGGER.error(e)
