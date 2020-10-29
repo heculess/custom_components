@@ -179,8 +179,9 @@ class SwitchMonitor:
 
             id_list = hass_states.get(self._group_id).attributes.get('entity_id')
             for device in id_list:
-                dev_id = device.split('_')
-                if dev_id[1] == id:
+                dev_name = device.split('.')
+                dev_id = dev_name[1].split('_')
+                if dev_id[0] == id or dev_id[1] == id:
                     return device
 
             return None
@@ -260,6 +261,10 @@ async def async_setup(hass, config):
             id = call.data[CONF_ID_DEVICE]
             if not id:
                 return
+
+            if id.find('_') > 0:
+                id_list = id.split('_')
+                id = id_list[1]
 
             await device.resume_device(device.get_device_by_id(id, hass.states), hass,"mqtt")
 
