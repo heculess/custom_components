@@ -463,6 +463,15 @@ class AsusRouter(AsusWrt):
 
         return False
 
+    async def get_wan_command(self, lines):
+        return lines % (await self.get_wan_index())
+
+    async def get_wan_index(self):
+        if await self.get_wan2_state() == 0:
+            return "wan0"
+
+        return "wan1"
+
     async def init_router(self):
 
         if self._last_cmd :
@@ -525,19 +534,22 @@ class AsusRouter(AsusWrt):
 
         try:
     
-            dnsenable = await self.connection.async_run_command("nvram get wan0_dnsenable_x")
+            dnsenable = await self.connection.async_run_command(
+                await self.get_wan_command("nvram get %s_dnsenable_x"))
             if not dnsenable:
                 return
             if dnsenable[0] == "0":
                 return
 
-            _LOGGER.info("need to disable dns from remote")
+            wan_index = await self.get_wan_index()
+            _LOGGER.info(" %s need to disable dns from remote" % (wan_index))
 
-            cmd = "nvram set wan0_dnsenable_x=0 ; "\
-                "nvram set wan0_dns='%s 114.114.114.114'; "\
-                "nvram set wan0_dns1_x='%s'; "\
-                "nvram set wan0_dns2_x='114.114.114.114'; "\
-                "nvram commit ; service restart_wan" % (self.host_to_gateway(),self.host_to_gateway())
+            cmd = "nvram set %s_dnsenable_x=0 ; "\
+                "nvram set %s='%s 114.114.114.114'; "\
+                "nvram set %s_dns1_x='%s'; "\
+                "nvram set %s_dns2_x='114.114.114.114'; "\
+                "nvram commit ; service restart_wan" % (wan_index,wan_index,self.host_to_gateway(),wan_index,
+                    self.host_to_gateway(),wan_index)
 
             await self.run_cmdline(cmd)
 
@@ -568,11 +580,13 @@ class AsusRouter(AsusWrt):
         if not self.vpn_protocol_valid(protocol):
             _LOGGER.error("set a wrong vpn protocol : %s" % (protocol))
             return
-
+            
+        wan_index = await self.get_wan_index()
         cmd = "nvram set vpnc_pppoe_username= ; nvram set vpnc_pppoe_passwd= ; "\
-                   "nvram set vpnc_proto=disable; nvram set wan0_proto=%s ; "\
-                   "nvram set wan0_dnsenable_x=1 ; nvram set wan0_dhcpenable_x=1 ; "\
-                   "nvram commit ; service restart_vpncall ; service restart_wan" % (protocol)
+                   "nvram set vpnc_proto=disable; nvram set %s_proto=%s ; "\
+                   "nvram set %s_dnsenable_x=1 ; nvram set %s_dhcpenable_x=1 ; "\
+                   "nvram commit ; service restart_vpncall ; service restart_wan" % (wan_index,
+                   protocol,wan_index,wan_index)
         if protocol != "dhcp":
             cmd = "nvram set vpnc_pppoe_username=%s; nvram set vpnc_pppoe_passwd=%s ; "\
                        "nvram set vpnc_proto=%s ; nvram set vpnc_heartbeat_x=%s ; "\

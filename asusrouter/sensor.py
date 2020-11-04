@@ -11,23 +11,23 @@ from . import DATA_ASUSWRT
 
 _LOGGER = logging.getLogger(__name__)
 
-_IP_WAN_CMD = 'nvram get wan0_ipaddr'
+_IP_WAN_CMD = 'nvram get %s_ipaddr'
 _WIFI_NAME_CMD = 'nvram get wl1_ssid'
 _IP_REBOOT_CMD = 'reboot'
-_CONNECT_STATE_WAN_CMD = 'nvram get wan0_state_t'
+_CONNECT_STATE_WAN_CMD = 'nvram get %s_state_t'
 _STATES_WIFI_5G_CMD = 'nvram get wl1_radio'
 _STATES_WIFI_2G_CMD = 'nvram get wl0_radio'
 
 _WIFI_CHANNEL_5G_CMD = 'wl -i eth2 status ; iwlist ath1 channel'
 _WIFI_CHANNEL_2G_CMD = 'wl -i eth1 status ; wlanconfig ath0 list'
 
-_ROUTER_WAN_PROTO_COMMAND = 'nvram get wan0_proto'
+_ROUTER_WAN_PROTO_COMMAND = 'nvram get %s_proto'
 
 _ROUTER_IS_INITED_COMMAND = 'find /etc/inited'
 _RET_IS_INITED = '/etc/inited'
 
-_ROUTER_RX_COMMAND = 'cat /sys/class/net/ppp0/statistics/rx_bytes'
-_ROUTER_TX_COMMAND = 'cat /sys/class/net/ppp0/statistics/tx_bytes'
+_ROUTER_RX_COMMAND = 'cat /sys/class/net/ppp%s/statistics/rx_bytes'
+_ROUTER_TX_COMMAND = 'cat /sys/class/net/ppp%s/statistics/tx_bytes'
 
 _DHCP_CLIENTS_COMMAND = 'cat /var/lib/misc/dnsmasq.leases'
 _ARP_LIST_COMMAND = 'arp -n'
@@ -131,17 +131,25 @@ class AsuswrtSensor(Entity):
         rx = await self.async_get_rx()
         tx = await self.async_get_tx()
         return rx, tx
+
+    async def get_ppp_index(self):
+        if await self._asusrouter.get_wan2_state() == 0:
+            return "0"
+
+        return "1"
         
     async def async_get_rx(self):
         """Get current RX total given in bytes."""
-        data = await self._asusrouter.connection.async_run_command(_ROUTER_RX_COMMAND)
+        data = await self._asusrouter.connection.async_run_command(
+            _ROUTER_RX_COMMAND % (await self.get_ppp_index()))
         if data and data[0].isdigit():
             return int(data[0])
         return 0
 
     async def async_get_tx(self):
         """Get current RX total given in bytes."""
-        data = await self._asusrouter.connection.async_run_command(_ROUTER_TX_COMMAND)
+        data = await self._asusrouter.connection.async_run_command(
+            _ROUTER_TX_COMMAND % (await self.get_ppp_index()))
         if  data and data[0].isdigit():
             return int(data[0])
         return 0
@@ -193,7 +201,7 @@ class AsuswrtSensor(Entity):
     async def async_get_wan_state(self):
 
         connect = await self._asusrouter.connection.async_run_command(
-            _CONNECT_STATE_WAN_CMD)
+            await self._asusrouter.get_wan_command(_CONNECT_STATE_WAN_CMD))
         if not connect:
             return
 
@@ -219,11 +227,11 @@ class AsuswrtSensor(Entity):
 
     async def async_get_ppoe_vpn(self):
         usrname = await self._asusrouter.connection.async_run_command(
-            "nvram get wan0_pppoe_username")
+            await self._asusrouter.get_wan_command("nvram get %s_pppoe_username"))
         if usrname:
             self._ppoe_username = usrname[0]
         heartbeat = await self._asusrouter.connection.async_run_command(
-            "nvram get wan0_heartbeat_x")
+            await self._asusrouter.get_wan_command("nvram get %s_heartbeat_x"))
         if heartbeat:
             self._ppoe_heartbeat = heartbeat[0]
 
@@ -337,8 +345,8 @@ class AsuswrtSensor(Entity):
                 self._initialized = False
 
             await self.async_get_vpn_state()
-
-            lines = await self._asusrouter.connection.async_run_command(_IP_WAN_CMD)
+            lines = await self._asusrouter.connection.async_run_command(
+                await self._asusrouter.get_wan_command(_IP_WAN_CMD))
             if lines:
                 self._wan_ip = lines[0]
 
@@ -355,7 +363,7 @@ class AsuswrtSensor(Entity):
                 await self._asusrouter.set_ssid(ssid[0])
 
             wan_proto = await self._asusrouter.connection.async_run_command(
-                _ROUTER_WAN_PROTO_COMMAND)
+                await self._asusrouter.get_wan_command(_ROUTER_WAN_PROTO_COMMAND))
             if wan_proto:
                 if wan_proto[0] == 'dhcp' or wan_proto[0] == 'static':
                     self._rates = await self._asusrouter.async_get_bytes_total()
