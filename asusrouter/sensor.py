@@ -304,15 +304,18 @@ class AsuswrtSensor(Entity):
                 self._rates = await self._asusrouter.async_get_bytes_total()
                 speed = await self._asusrouter.async_get_current_transfer_rates()
 
-                if speed and len(speed) > 0:
-                    await self._asusrouter.set_download_speed(round(speed[0]/1000, 2))
-                else:
-                    await self._asusrouter.set_download_speed(0.00)
+                try:
+                    if speed[0]:
+                        await self._asusrouter.set_download_speed(round(speed[0]/1000, 2))
+                except  Exception as e:
+                        await self._asusrouter.set_download_speed(0.00)
 
-                if speed and len(speed) > 1 and speed[1]:
-                    await self._asusrouter.set_upload_speed(round(speed[1]/1000, 2))
-                else:
-                    await self._asusrouter.set_upload_speed(0.00)       
+                try:
+                    if speed[1]:
+                        await self._asusrouter.set_upload_speed(round(speed[1]/1000, 2))
+                except  Exception as e:
+                        await self._asusrouter.set_upload_speed(0.00)
+                  
 
             wifi_states_5g = await self._asusrouter.connection.async_run_command(
                 _STATES_WIFI_5G_CMD)
@@ -369,16 +372,20 @@ class AsuswrtRouterSensor(AsuswrtSensor):
     @property
     def download(self):
         """Return the total download."""
-        if self._rates and len(self._rates) > 0:
-            return round(self._rates[0]/1000000000, 2)
-        return 0
+        try:
+            if self._rates[0]:
+                return round(self._rates[0]/1000000000, 2)
+        except  Exception as e:
+            return 0
 
     @property
     def upload(self):
         """Return the total upload."""
-        if self._rates and len(self._rates) > 1 and self._rates[1]:
-            return round(self._rates[1]/1000000000, 2)
-        return 0
+        try:
+            if self._rates[1]:
+                return round(self._rates[1]/1000000000, 2)
+        except  Exception as e:
+            return 0
       
     @property  
     def device_state_attributes(self):

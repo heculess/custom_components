@@ -44,6 +44,8 @@ class PowerSensor(Entity):
         self._hass = hass
         self._current_power = 0.0
 
+        self._last_power_on_stamp = None
+
         self._hass.bus.async_listen(EVENT_STATE_CHANGED,self._on_state_change)
         self._hass.bus.async_listen(EVENT_TIME_CHANGED,self._on_time_change)
 
@@ -61,6 +63,9 @@ class PowerSensor(Entity):
           item = self._hass.states.get(device)
           if not item:
             return 0.0
+
+          if item.state == 'off' :
+            self._last_power_off = device
 
           power = item.attributes.get(self._power_key)
           if not power:
@@ -92,6 +97,27 @@ class PowerSensor(Entity):
 
             self._devices_power_dict[device] = power
 
+    def is_ready_to_power_on(self):
+
+        if not self._last_power_on_stamp:
+            return True
+
+#        if self.get_max_power() - self._current_power >500 :
+#            return True
+
+        time_diff = dt_util.utcnow() - self._last_power_on_stamp
+        if time_diff.total_seconds() > 300:
+            return True
+
+        return False
+
+    async def power_on_switch(self,switch_to_power_on):
+   
+        if self.is_ready_to_power_on():
+            await self._hass.services.async_call("switch", 
+                SERVICE_TURN_ON, {ATTR_ENTITY_ID: switch_to_power_on})
+            self._last_power_on_stamp = dt_util.utcnow()
+
     async def get_power_count(self):
  
         self._last_power_off = ""
@@ -110,8 +136,7 @@ class PowerSensor(Entity):
 
                 if self._auto_restart and self._ready_to_power_on:
                     _LOGGER.debug(" Turn on the device : %s", self._ready_to_power_on)
-                    await self._hass.services.async_call("switch", 
-                        SERVICE_TURN_ON, {ATTR_ENTITY_ID: self._ready_to_power_on})
+                    await self.power_on_switch(self._ready_to_power_on)
 
             return self._current_power
                     
@@ -134,8 +159,9 @@ class PowerSensor(Entity):
             if triger_id not in self._devices_power_dict.keys():
                 return
 
-            _LOGGER.debug("devices %s states change to %s", triger_id, state.state)
-            if state.state == "off":
+            old_state = event.data.get("old_state")
+            if old_state and old_state.state == "on" and state.state == "off":
+                _LOGGER.debug("devices %s states change to %s", triger_id, state.state)
                 self._state_off_dict[triger_id] = dt_util.utcnow()
                 return
 
