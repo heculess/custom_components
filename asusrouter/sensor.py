@@ -176,7 +176,7 @@ class AsuswrtSensor(Entity):
                 if len(ip_split) > 2:
                     ip_regx = _IP_REGEX.findall(ip_split[1])
                     if ip_regx:
-                        public_ip = "%s    %s" % (ip_regx[0],ip_split[2])
+                        public_ip = "%s    %s" % (ip_regx[0],ip_split[2].replace('中国 ', ''))
 
             await self._asusrouter.connection.async_run_command('rm getip')
             await self._asusrouter.connection.async_run_command(
