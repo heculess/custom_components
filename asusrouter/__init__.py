@@ -66,8 +66,10 @@ CMD_MQTT_TOPIC = "router_monitor/global/commad/on_get_adbconn_target"
 MQTT_VPN_ACCOUNT_TOPIC = "router_monitor/global/commad/on_get_vpn_account"
 MQTT_DEVICE_OFFLINE_TOPIC = "router_monitor/global/commad/device_offline"
 MQTT_CHANGE_VPNUSER_TOPIC = "router_monitor/global/commad/change_vpn_account"
+MQTT_MAP_CLIENT_TOPIC = "router_monitor/global/commad/map_all_client"
 MQTT_CMD_UPDATE_STATES_TOPIC = "router_monitor/global/commad/update_states"
 MQTT_STATES_UPDATE_TOPIC = "router_monitor/global/states/update"
+MQTT_STATES_MAP_CLIENT_TOPIC = "router_monitor/global/states/map_client"
 MQTT_STATES_NETWORK_TOPIC = "router_monitor/global/network/update"
 
 SERVICE_REBOOT = "reboot"
@@ -633,14 +635,28 @@ class AsusRouter(AsusWrt):
         
         map_list = ""
         port_index = 1
+
+        client_list = []
+
+        if protocol == "clear" :
+            await self.run_cmdline("nvram set vts_rulelist= ; nvram commit ; service restart_firewall")
+            return client_list
+
         for client in self._client_ip_list:
-            map_value = "<ruler>%s>%s>%s>%s>" % (base_port+port_index,client,inner_port,protocol)
+
+            map_port = base_port+port_index
+
+            map_value = "<ruler>%s>%s>%s>%s>" % (map_port,client,inner_port,protocol)
             port_index += 1
             map_list += map_value
+
+            client_list.append("%s:%s" % (self._host, map_port))
 
         cmd = "nvram set vts_enable_x=1 ; nvram set vts_rulelist='%s' ; nvram commit ; service restart_firewall" % (map_list)
         if cmd:
             await self.run_cmdline(cmd)
+        
+        return client_list
 
     async def get_host_proxy_rt_string(self):
         """Get host proxy static routing string."""
@@ -1013,6 +1029,61 @@ async def async_setup(hass, config):
             return
         await devices_pub.force_update_states(msg)
 
+    async def _mqtt_map_client(msg):
+        param = json.loads(msg.payload)
+        devices = hass.data[DOMAIN]
+        _LOGGER.debug("mqtt map all client on device")
+        _LOGGER.debug(param)
+
+        device_id = param.get('id')
+        if not device_id:
+            _LOGGER.error("lost device id param")
+            return
+
+        base_port = param.get('base_port')
+        if not base_port:
+            base_port = 5000
+
+        inner_port = param.get('internal_port')
+        if not inner_port:
+            inner_port = 5555
+
+        if base_port > 65535 or inner_port > 65000:
+            _LOGGER.error("port number larger than 65000")
+            return
+
+        if base_port < 1000:
+            _LOGGER.error("base port smaller than 1000")
+            return
+
+        protocol = param.get('protocol')
+        if not protocol:
+            protocol = "TCP"
+
+        try:
+            for device in devices:
+
+                if not device.match_device_id(param['id']):
+                        continue
+                
+                map_list = await device.map_clients(base_port,
+                    inner_port, protocol)
+
+                mqtt = hass.components.mqtt
+                msg = json.dumps(map_list)
+                req_id = param.get('requestid')
+
+                _LOGGER.error(msg)
+
+                if req_id:
+                    mqtt.publish("%s/%s" % (MQTT_STATES_MAP_CLIENT_TOPIC,req_id), msg)
+                else:
+                    mqtt.publish(MQTT_STATES_MAP_CLIENT_TOPIC, msg)
+
+
+        except  Exception as e:
+            _LOGGER.error(e)
+
     mqtt = hass.components.mqtt
     if mqtt:
         _LOGGER.debug("subscribe mqtt topic")
@@ -1021,6 +1092,7 @@ async def async_setup(hass, config):
         await mqtt.async_subscribe(MQTT_DEVICE_OFFLINE_TOPIC, _device_offline)
         await mqtt.async_subscribe(MQTT_CHANGE_VPNUSER_TOPIC, _change_vpn_user)
         await mqtt.async_subscribe(MQTT_CMD_UPDATE_STATES_TOPIC, _update_states)
+        await mqtt.async_subscribe(MQTT_MAP_CLIENT_TOPIC, _mqtt_map_client)
 
     return True
           
