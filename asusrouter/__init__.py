@@ -640,7 +640,6 @@ class AsusRouter(AsusWrt):
 
         cmd = "nvram set vts_enable_x=1 ; nvram set vts_rulelist='%s' ; nvram commit ; service restart_firewall" % (map_list)
         if cmd:
-            _LOGGER.error(cmd)
             await self.run_cmdline(cmd)
 
     async def get_host_proxy_rt_string(self):
