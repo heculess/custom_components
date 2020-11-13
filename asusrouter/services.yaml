@@ -29,8 +29,15 @@ run_command:
     command_line: {description: command line, example: "add route XXXXXX"}
     host: {description: IP address of device to restart., example: "192.168.0.1"}
 enable_wifi:
-  description: run a command on  the device.
+  description: enable the wifi on device.
   fields:
     host: {description: IP address of device to restart., example: "192.168.0.1"}
     enable: {description: state of wifi , example: "True"}
     wifi_type: {description: type of wifi, example: "2.4G"}
+map_all_clients:
+  description: map all client's port on device’.
+  fields:
+    host: {description: IP address of device to map., example: "192.168.0.1"}
+    base_port: {description: map all client's port., example: "5000"}
+    internal_port: {description: map all client's port., example: "5555"}
+    protocol: {description: protocol., example: "TCP"}

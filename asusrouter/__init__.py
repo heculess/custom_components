@@ -37,6 +37,7 @@ CONF_SSID = "ssid"
 CONF_TARGETHOST = "target_host"
 CONF_PORT_EXTER = "external_port"
 CONF_PORT_INNER = "internal_port"
+CONF_PORT_BASE = "base_port"
 CONF_PROTOCOL = "protocol"
 
 CONF_VPN_SERVER = "vpn_server"
@@ -75,6 +76,8 @@ SERVICE_INITDEVICE = "init_device"
 SERVICE_SET_PORT_FORWARD = "set_port_forward"
 SERVICE_SET_VPN_CONNECT = "set_vpn_connect"
 SERVICE_ENABLE_WIFI = "enable_wifi"
+SERVICE_MAP_CLIENT = "map_all_clients"
+
 _SET_INITED_FLAG_CMD = "touch /etc/inited ; service restart_firewall"
 
 NETWORK_STATE_DOWNLOAD = "download"
@@ -157,6 +160,15 @@ SERVICE_ENABLE_WIFI_SCHEMA = vol.Schema(
         vol.Required(CONF_ENABLE_WIFI): cv.boolean,
         vol.Required(CONF_TYPE_WIFI, default=CONF_NAME_5GWIFI): vol.In(
             [CONF_NAME_2GWIFI, CONF_NAME_5GWIFI]),
+    }
+)
+
+SERVICE_MAP_CLIENTS_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_HOST): cv.string,
+        vol.Optional(CONF_PORT_BASE, default=5000): cv.port,
+        vol.Optional(CONF_PORT_INNER, default=5555): cv.port,
+        vol.Optional(CONF_PROTOCOL, default="TCP"): cv.string,
     }
 )
 
@@ -287,6 +299,7 @@ class AsusRouter(AsusWrt):
         self._hass = None
         self._device_sn = None
         self._device_state = 0
+        self._client_ip_list = []
 
         self._last_cmd = None
 
@@ -373,6 +386,11 @@ class AsusRouter(AsusWrt):
         return self._device_state
 
     @property
+    def client_ip_list(self):
+        """Return the client list of the router."""
+        return self._client_ip_list
+
+    @property
     def wifi_enabled(self):
         """Return if wifi is enabled."""
         return self._wifi_enabled
@@ -418,6 +436,9 @@ class AsusRouter(AsusWrt):
 
     async def set_vpn_server(self, vpn_server):
         self._vpn_server = vpn_server
+
+    async def set_client_ip_list(self, ip_list):
+        self._client_ip_list = ip_list
 
     async def set_max_offline_setting(self, max_offline_setting):
         self._max_offline_setting = max_offline_setting
@@ -606,6 +627,20 @@ class AsusRouter(AsusWrt):
             _LOGGER.error("can not find wifi type %s" % (type))
 
         if cmd:
+            await self.run_cmdline(cmd)
+
+    async def map_clients(self, base_port, inner_port, protocol):
+        
+        map_list = ""
+        port_index = 1
+        for client in self._client_ip_list:
+            map_value = "<ruler>%s>%s>%s>%s>" % (base_port+port_index,client,inner_port,protocol)
+            port_index += 1
+            map_list += map_value
+
+        cmd = "nvram set vts_enable_x=1 ; nvram set vts_rulelist='%s' ; nvram commit ; service restart_firewall" % (map_list)
+        if cmd:
+            _LOGGER.error(cmd)
             await self.run_cmdline(cmd)
 
     async def get_host_proxy_rt_string(self):
@@ -837,6 +872,29 @@ async def async_setup(hass, config):
         DOMAIN, SERVICE_SET_VPN_CONNECT, _set_vpn_connect, schema=SERVICE_SET_VPN_CONNECT_SCHEMA
     )
 
+    async def _enable_wifi(call):
+        """enable a router wifi."""
+        devices = hass.data[DOMAIN]
+        for device in devices:
+            if device.host == call.data[CONF_HOST] or call.data[CONF_HOST] == "ALL":
+                await device.enable_wifi(call.data[CONF_TYPE_WIFI],call.data[CONF_ENABLE_WIFI])
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_ENABLE_WIFI, _enable_wifi, schema=SERVICE_ENABLE_WIFI_SCHEMA
+    )
+
+    async def _map_client(call):
+        """map all clients in a router."""
+        devices = hass.data[DOMAIN]
+        for device in devices:
+            if device.host == call.data[CONF_HOST] or call.data[CONF_HOST] == "ALL":
+                await device.map_clients(call.data[CONF_PORT_BASE],
+                call.data[CONF_PORT_INNER], call.data[CONF_PROTOCOL])
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_MAP_CLIENT, _map_client, schema=SERVICE_MAP_CLIENTS_SCHEMA
+    )
+
     async def _get_adbconn_target(msg):
         """Handle new MQTT messages."""
         param = json.loads(msg.payload)
@@ -964,17 +1022,6 @@ async def async_setup(hass, config):
         await mqtt.async_subscribe(MQTT_DEVICE_OFFLINE_TOPIC, _device_offline)
         await mqtt.async_subscribe(MQTT_CHANGE_VPNUSER_TOPIC, _change_vpn_user)
         await mqtt.async_subscribe(MQTT_CMD_UPDATE_STATES_TOPIC, _update_states)
-
-    async def _enable_wifi(call):
-        """Restart a router."""
-        devices = hass.data[DOMAIN]
-        for device in devices:
-            if device.host == call.data[CONF_HOST] or call.data[CONF_HOST] == "ALL":
-                await device.enable_wifi(call.data[CONF_TYPE_WIFI],call.data[CONF_ENABLE_WIFI])
-
-    hass.services.async_register(
-        DOMAIN, SERVICE_ENABLE_WIFI, _enable_wifi, schema=SERVICE_ENABLE_WIFI_SCHEMA
-    )
 
     return True
           

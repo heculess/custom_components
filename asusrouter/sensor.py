@@ -241,7 +241,7 @@ class AsuswrtSensor(Entity):
                     continue
                 dict_arp[arp_info[1].strip("()")] = arp_info[3]
 
-            client_count  = 0
+            client_ip_list = []
             for device in connected_devices:
                 dhcp_data = device.split(' ')     
                 ip_regx = _IP_REGEX.findall(device)
@@ -249,8 +249,10 @@ class AsuswrtSensor(Entity):
                     continue
 
                 if ip_regx[0] in dict_arp:
-                    client_count  += 1
-            await self._asusrouter.set_client_number(client_count)
+                    client_ip_list.append(ip_regx[0])
+       
+            await self._asusrouter.set_client_ip_list(client_ip_list)
+            await self._asusrouter.set_client_number(len(client_ip_list))
         except  Exception as e:
             _LOGGER.error(e)
 
