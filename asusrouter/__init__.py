@@ -4,90 +4,26 @@ import json
 import voluptuous as vol
 
 from homeassistant.const import (
-    ATTR_NOW,
-
     CONF_NAME,
     CONF_HOST,
     CONF_PASSWORD,
     CONF_USERNAME,
     CONF_PORT,
-
-    EVENT_TIME_CHANGED,
 )
+
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.discovery import async_load_platform
-from homeassistant.util import dt as dt_util
 from aioasuswrt.asuswrt import AsusWrt
 from datetime import datetime
 
+from .const import *
+from .wrtmqttpub import WrtMqttPub
+
 _LOGGER = logging.getLogger(__name__)
 
-CONF_PUB_KEY = "pub_key"
-CONF_SENSORS = "sensors"
-CONF_SSH_KEY = "ssh_key"
-CONF_USE_TELNET = "use_telnet"
-CONF_ADD_ATTR = "add_attribute"
-CONF_PUB_MQTT = "pub_mqtt"
-CONF_SR_HOST_ID = "sr_host_id"
-CONF_SR_CACHING_PROXY = "sr_caching_proxy"
-CONF_SR_HOST_PROXY = "sr_host_proxy"
-CONF_MAX_OFFINE_SETTING = "max_offline_setting"
-CONF_INIT_COMMAND = "init_command"
-CONF_SSID = "ssid"
-CONF_TARGETHOST = "target_host"
-CONF_PORT_EXTER = "external_port"
-CONF_PORT_INNER = "internal_port"
-CONF_PORT_BASE = "base_port"
-CONF_PROTOCOL = "protocol"
-
-CONF_VPN_SERVER = "vpn_server"
-CONF_VPN_USERNAME = "vpn_username"
-CONF_VPN_PASSWORD = "vpn_password"
-CONF_VPN_PROTOCOL = "vpn_protocol"
-
-CONF_COMMAND_LINE = "command_line"
-
-CONF_ENABLE_WIFI = "enable"
-CONF_TYPE_WIFI = "wifi_type"
-
-CONF_NAME_2GWIFI = '2.4g'
-CONF_NAME_5GWIFI = '5g'
-
-DEFAULT_RETRY = 3
 
 DOMAIN = "asusrouter"
-DOMAIN_MQTT_PUB = "asusrouter_mqtt_pub"
-CONF_ROUTERS = "routers"
 DATA_ASUSWRT = DOMAIN
-DEFAULT_SSH_PORT = 22
-DEFAULT_MAX_OFFINLE = 5
-
-CMD_MQTT_TOPIC = "router_monitor/global/commad/on_get_adbconn_target"
-MQTT_VPN_ACCOUNT_TOPIC = "router_monitor/global/commad/on_get_vpn_account"
-MQTT_DEVICE_OFFLINE_TOPIC = "router_monitor/global/commad/device_offline"
-MQTT_CHANGE_VPNUSER_TOPIC = "router_monitor/global/commad/change_vpn_account"
-MQTT_MAP_CLIENT_TOPIC = "router_monitor/global/commad/map_all_client"
-MQTT_CMD_UPDATE_STATES_TOPIC = "router_monitor/global/commad/update_states"
-MQTT_STATES_UPDATE_TOPIC = "router_monitor/global/states/update"
-MQTT_STATES_MAP_CLIENT_TOPIC = "router_monitor/global/states/map_client"
-MQTT_STATES_NETWORK_TOPIC = "router_monitor/global/network/update"
-
-SERVICE_REBOOT = "reboot"
-SERVICE_RUNCOMMAND = "run_command"
-SERVICE_INITDEVICE = "init_device"
-SERVICE_SET_PORT_FORWARD = "set_port_forward"
-SERVICE_SET_VPN_CONNECT = "set_vpn_connect"
-SERVICE_ENABLE_WIFI = "enable_wifi"
-SERVICE_MAP_CLIENT = "map_all_clients"
-
-_SET_INITED_FLAG_CMD = "touch /etc/inited ; service restart_firewall"
-
-NETWORK_STATE_DOWNLOAD = "download"
-NETWORK_STATE_UPLOAD = "upload"
-NETWORK_STATE_DOWNLOAD_SPEED = "download_speed"
-NETWORK_STATE_UPLOAD_SPEED = "upload_speed"
-
-SECRET_GROUP = "Password or SSH Key"
 
 ROUTER_CONFIG = vol.Schema(
     {
@@ -173,105 +109,6 @@ SERVICE_MAP_CLIENTS_SCHEMA = vol.Schema(
         vol.Optional(CONF_PROTOCOL, default="TCP"): cv.string,
     }
 )
-
-class AsusWrtMqttPub:
-    def __init__(self, hass, publish):
-        self._hass = hass
-        self._state_publish = False
-        self._network_publish = False
-        self._mqtt = hass.components.mqtt
-        self._last_pub_time = dt_util.utcnow()
-        self._last_pub_states = {}
-        self._router_state = {}
-        self._network_state = {}
-
-        self._hass.bus.async_listen(EVENT_TIME_CHANGED,self._on_time_change)
-
-        mqtt = hass.components.mqtt
-        if mqtt:
-            _LOGGER.debug("subscribe mqtt topic")
-            
-        pub_list = publish.split(',')
-        _LOGGER.debug(pub_list)
-        for pub in pub_list:
-            if pub == "state":
-                self._state_publish = True
-                _LOGGER.debug("AsusWrtMqtt : publish states")
-            if pub == "network":
-                self._network_publish = True
-                _LOGGER.debug("AsusWrtMqtt : publish network")
-
-    def update_router_state(self, name, states):
-        network_states = {}
-
-        try:
-            network_states[NETWORK_STATE_DOWNLOAD_SPEED] = states.pop(NETWORK_STATE_DOWNLOAD_SPEED)
-            network_states[NETWORK_STATE_UPLOAD_SPEED] = states.pop(NETWORK_STATE_UPLOAD_SPEED)
-            network_states[NETWORK_STATE_DOWNLOAD] = states.pop(NETWORK_STATE_DOWNLOAD)
-            network_states[NETWORK_STATE_UPLOAD] = states.pop(NETWORK_STATE_UPLOAD)
-            
-            self._network_state[name] = json.dumps(network_states)
-            self._router_state[name] = json.dumps(states)
-        except Exception as e:
-            self._router_state = {}
-            self._network_state = {}
-            _LOGGER.error(e)
-    
-    async def _on_time_change(self, event):
-        try:
-            time_now = event.data.get(ATTR_NOW)
-            if not time_now:
-                return
-
-            time_diff = time_now - self._last_pub_time
-            if time_diff.total_seconds() < 60 :
-                return
-
-            if self._state_publish == True:
-                _LOGGER.debug("AsusWrtMqtt : %s" % self._state_publish)
-                mqtt_publish = {}
-                for key,value in self._router_state.items():
-
-                    update_state = False
-                    if key in self._last_pub_states:
-                        if value != self._last_pub_states[key] :
-                            update_state = True  
-                    else :
-                        update_state = True
-
-                    if update_state :
-                        self._last_pub_states[key] = value
-                        mqtt_publish[key] = value
-
-                states =  json.dumps(mqtt_publish)
-                _LOGGER.debug("mqtt publish routers states")
-                _LOGGER.debug(states)
-                    
-                self._mqtt.publish(MQTT_STATES_UPDATE_TOPIC,states)
-
-            if self._network_publish == True:
-                
-                _LOGGER.debug("mqtt publish routers network information")      
-                self._mqtt.publish(MQTT_STATES_NETWORK_TOPIC,json.dumps(self._network_state))
-
-            _LOGGER.debug(time_now)
-            self._last_pub_time = time_now
-
-        except Exception as e:
-            _LOGGER.error(e)
-
-    async def force_update_states(msg):
-        """Handle new MQTT messages."""
-        param = json.loads(msg.payload)
-        update_list = param['list']
-        _LOGGER.debug("mqtt force update device")
-        if not offline_list:
-            return
-
-        for update_item in update_list:
-            if update_item in self._last_pub_states:
-                del self._last_pub_states[update_item]
-
 
 class AsusRouter(AsusWrt):
     """interface of a asusrouter."""
@@ -812,7 +649,7 @@ async def async_setup(hass, config):
         routers.append(router)
 
     hass.data[DATA_ASUSWRT] = routers
-    hass.data[DOMAIN_MQTT_PUB] = AsusWrtMqttPub(hass,config[DOMAIN][CONF_PUB_MQTT])
+    hass.data[DOMAIN_MQTT_PUB] = WrtMqttPub(hass,config[DOMAIN][CONF_PUB_MQTT])
 
     hass.async_create_task(
         async_load_platform(hass, "sensor", DOMAIN, {}, config)
