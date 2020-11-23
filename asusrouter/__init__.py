@@ -345,7 +345,7 @@ class AsusRouter(AsusWrt):
 
     async def init_device(self, command_line):
         await self.run_command(command_line)
-        await self.run_command(_SET_INITED_FLAG_CMD)
+        await self.run_command(SET_INITED_FLAG_CMD)
 
     async def run_cmdline(self, command_line):
         self._connect_failed = False

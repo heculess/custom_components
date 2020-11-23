@@ -57,7 +57,7 @@ SERVICE_SET_VPN_CONNECT = "set_vpn_connect"
 SERVICE_ENABLE_WIFI = "enable_wifi"
 SERVICE_MAP_CLIENT = "map_all_clients"
 
-_SET_INITED_FLAG_CMD = "touch /etc/inited ; service restart_firewall"
+SET_INITED_FLAG_CMD = "touch /etc/inited ; service restart_firewall"
 
 NETWORK_STATE_DOWNLOAD = "download"
 NETWORK_STATE_UPLOAD = "upload"
