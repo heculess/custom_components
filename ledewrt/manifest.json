@@ -1,0 +1,13 @@
+{
+  "domain": "ledewrt",
+  "name": "ledewrt",
+  "documentation": "https://www.home-assistant.io/integrations/asuswrt",
+  "requirements": [
+  ],
+  "dependencies": [
+    "mqtt"
+  ],
+  "codeowners": [
+    "@heculess"
+  ]
+}

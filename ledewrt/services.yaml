@@ -1,0 +1,43 @@
+reboot:
+  description: restart the device.
+  fields:
+    host: {description: IP address of device to restart., example: "192.168.0.1"}
+init_device:
+  description: run a command on  the device.
+  fields:
+    init_dns: {description: command line, example: "add route XXXXXX"}
+    host: {description: IP address of device to restart., example: "192.168.0.1"}
+set_port_forward:
+  description: set a port forward ruler on  the device.
+  fields:
+    ssid: {description: command line, example: "T1"}
+    external_port: {description: port number., example: "5555"}
+    internal_port: {description: port number., example: "5555"}
+    protocol: {description: protocol., example: "TCP"}
+    target_host: {description: IP address of target., example: "192.168.0.1"}
+set_vpn_connect:
+  description: set a port forward ruler on  the device.
+  fields:
+    ssid: {description: command line, example: "T1"}
+    server: {description: vpn server., example: "5555"}
+    username: {description: vpn user name}
+    password: {description: vpn user password.}
+    protocol: {description: protocol of vpn., example: "L2TP"}
+run_command:
+  description: run a command on  the device.
+  fields:
+    command_line: {description: command line, example: "add route XXXXXX"}
+    host: {description: IP address of device to restart., example: "192.168.0.1"}
+enable_wifi:
+  description: enable the wifi on device.
+  fields:
+    host: {description: IP address of device to restart., example: "192.168.0.1"}
+    enable: {description: state of wifi , example: "True"}
+    wifi_type: {description: type of wifi, example: "2.4g"}
+map_all_clients:
+  description: map all client's port on device’.
+  fields:
+    host: {description: IP address of device to map., example: "192.168.0.1"}
+    base_port: {description: map all client's port., example: "5000"}
+    internal_port: {description: map all client's port., example: "5555"}
+    protocol: {description: protocol., example: "TCP"}
