@@ -577,16 +577,10 @@ class LedeWrt:
         for client in self._client_ip_list:
 
             map_port = base_port+port_index
-
-            map_value = "<ruler>%s>%s>%s>%s>" % (map_port,client,inner_port,protocol)
             port_index += 1
-            map_list += map_value
+            await self.set_port_forward(map_port,inner_port,protocol,client)
 
             client_list.append("%s:%s" % (self._host, map_port))
-
-        cmd = "nvram set vts_enable_x=1 ; nvram set vts_rulelist='%s' ; nvram commit ; service restart_firewall" % (map_list)
-        if cmd:
-            await self.run_cmdline(cmd)
         
         return client_list
 
