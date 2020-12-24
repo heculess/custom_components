@@ -39,6 +39,7 @@ class PowerSensor(Entity):
         self._max_power = monitor.max_power
         self._max_power_conf = monitor.max_power_conf
         self._auto_restart = monitor.auto_restart
+        self._extra_power_monitor_group = monitor.extra_power_monitor_group
         self._last_power_off = ""
         self._ready_to_power_on = ""
         self._hass = hass
@@ -60,18 +61,24 @@ class PowerSensor(Entity):
     def get_device_power(self, device):
         """Fetch device power."""
         try:
-          item = self._hass.states.get(device)
-          if not item:
-            return 0.0
+            item = self._hass.states.get(device)
+            if not item:
+                return 0.0
 
-          if item.state == 'off' :
-            self._last_power_off = device
+            if item.domain == "sensor":
+                try:
+                    return float(item.state)
+                except  Exception as e:
+                    return 0.0
 
-          power = item.attributes.get(self._power_key)
-          if not power:
-              return 0.0
+            if item.state == 'off' :
+                self._last_power_off = device
 
-          return float(power)
+            power = item.attributes.get(self._power_key)
+            if not power:
+                return 0.0
+
+            return float(power)
         except  Exception as e:
             _LOGGER.error(e)
             return 0.0
@@ -125,8 +132,15 @@ class PowerSensor(Entity):
 
         try:
             if not self._devices_power_dict :
+
+                monitor_group_id = self._extra_power_monitor_group
+                
+                if monitor_group_id == "":
+                    monitor_group_id = self._group_id
+
                 self._devices_power_dict = dict.fromkeys(
-                    self._hass.states.get(self._group_id).attributes.get('entity_id'))
+                        self._hass.states.get(monitor_group_id).attributes.get('entity_id'))
+                
                 _LOGGER.debug(" Get group devices : %s", str(self._devices_power_dict))
 
             self.update_current_power()
