@@ -1,14 +1,17 @@
 {
   "domain": "asusrouter",
   "name": "asusrouter",
+  "config_flow": false,
   "documentation": "https://www.home-assistant.io/integrations/asuswrt",
   "requirements": [
-    "aioasuswrt==1.3.1"
+    "aioasuswrt==1.3.4"
   ],
   "dependencies": [
     "mqtt"
   ],
   "codeowners": [
     "@heculess"
-  ]
+  ],
+  "iot_class": "local_polling",
+  "version": "1.0"
 }

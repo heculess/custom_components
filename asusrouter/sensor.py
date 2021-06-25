@@ -414,11 +414,6 @@ class AsuswrtRouterSensor(AsuswrtSensor):
             'vpn_proto': self._ppoe_proto,
         }
 
-    @property
-    def unit_of_measurement(self):
-        """Return the unit of measurement."""
-        return " "
-
     async def async_update(self):
         """Fetch new state data for the sensor."""
         await super().async_update()

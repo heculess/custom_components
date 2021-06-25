@@ -200,7 +200,7 @@ class SwitchMonitor:
                 _LOGGER.warning("%s turn off device %s" % (operator, fur_switch))
                 await hass.services.async_call("switch", SERVICE_TURN_OFF, {ATTR_ENTITY_ID: fur_switch})
             else:
-                _LOGGER.debug("miss device further infomation %s" % (fur_switch))
+                _LOGGER.warning("miss device further infomation %s" % (fur_switch))
             await self.remove_turn_count_dict(item)
         else:
             _LOGGER.warning("%s turn on device %s" % (operator, item))

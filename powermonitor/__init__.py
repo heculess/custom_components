@@ -1,4 +1,4 @@
-"""Support for PowerMonitor devices."""
+"""Support for PowerMonito devices."""
 import logging
 
 import voluptuous as vol
@@ -21,7 +21,6 @@ CONF_MAX_POWER = 'max_power'
 CONF_MAX_POWER_CONF = 'max_power_config'
 CONF_GROUPS = "groups"
 CONF_AUTO_RESTART = 'auto_restart'
-CONF_EXTRA_POWER_MONITOR = 'extra_power_monitor_group'
 
 CONF_ID_LIST = 'id_list'
 
@@ -37,7 +36,6 @@ GROUP_CONFIG = vol.Schema(
         vol.Optional(CONF_MAX_POWER ,default=DEFAULT_MAX_POWER): cv.positive_int,
         vol.Optional(CONF_MAX_POWER_CONF,default=""): cv.string,
         vol.Optional(CONF_AUTO_RESTART,default=True): cv.boolean,
-        vol.Optional(CONF_EXTRA_POWER_MONITOR,default=""): cv.string,
     }
 )
 
@@ -69,43 +67,34 @@ class PowerMonitor:
         self._max_power = max_power
         self._max_power_conf = max_power_conf
         self._auto_restart = True
-        self._extra_power_monitor_group = ""
 
     @property
     def group_id(self):
-        """Return the name of the PowerMonitor."""
+        """Return the name of the PowerMonito."""
         return self._group_id
 
     @property
     def power_key(self):
-        """Return the name of the PowerMonitor."""
+        """Return the name of the PowerMonito."""
         return self._power_key
 
     @property
     def max_power(self):
-        """Return the name of the PowerMonitor."""
+        """Return the name of the PowerMonito."""
         return self._max_power
 
     @property
     def max_power_conf(self):
-        """Return the name of the PowerMonitor."""
+        """Return the name of the PowerMonito."""
         return self._max_power_conf
 
     @property
     def auto_restart(self):
-        """Return the name of the PowerMonitor."""
+        """Return the name of the PowerMonito."""
         return self._auto_restart
-
-    @property
-    def extra_power_monitor_group(self):
-        """Return the group_id of the extra powe monitor."""
-        return self._extra_power_monitor_group
 
     def set_auto_restart(self, auto_restart):
         self._auto_restart = auto_restart
-
-    def set_extra_power_monitor(self, monitor_group):
-        self._extra_power_monitor_group = monitor_group
 
 
 async def async_setup(hass, config):
@@ -128,7 +117,6 @@ async def async_setup(hass, config):
         )
         
         monitor.set_auto_restart(conf[CONF_AUTO_RESTART])
-        monitor.set_extra_power_monitor(conf[CONF_EXTRA_POWER_MONITOR])
         monitors.append(monitor)
 
     power_monitor['name'] = config[DOMAIN][CONF_NAME]

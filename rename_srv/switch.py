@@ -36,7 +36,6 @@ class RenameSrvSwitche(SwitchEntity):
     @property
     def name(self):
         """Return the name of the switch."""
-        _LOGGER.info("[renamesrv_gateway] RenameSrvSwitche name:%s\n" % self._server.srv_name())
         return self._server.srv_name()
 
     @property
